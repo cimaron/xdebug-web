@@ -1,0 +1,166 @@
+
+.container-fluid {
+	padding: 0;
+}
+
+#src_container {
+	position: relative;
+	font-family: "Courier New", Courier, monospace;
+	font-size: 12px;
+	color: #000000;
+	white-space: pre;
+	height: 600px;
+	tab-size: 4;
+	-moz-tab-size: 4;
+}
+
+#src {
+	position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+}
+
+#addwatch {
+	width: 100%;
+}
+
+#console-container {
+	overflow: auto;
+}
+
+#console-container > div {
+	border-bottom: solid 1px #CCCCCC;
+	border-collapse: collapse;
+}
+
+#console-container > div.watch {
+	border-bottom-width: 0;
+}
+
+.watch {
+	font-size: 12px;
+	color: #000000;
+}
+
+.watch tr {
+	border-bottom: solid 1px #F6F6F6;
+}
+
+.watch tr.watch-top {
+	border: solid 1px #CCCCCC;
+	border-width: 1px 0 1px 0;
+	background-color: #F6F6F6;
+}
+
+.watch tr > td:first-child {
+	padding: 0 10px 0 10px;
+	white-space: nowrap;
+	vertical-align: top;
+}
+
+.watch tr > td:nth-child(2) {
+	width: 100%;
+	padding-left: 10px;
+}
+
+.watch tr > td:first-child > span {
+	position: relative;
+	padding-left: 17px;
+}
+
+.watch-toggle {
+	float: left;
+	position: absolute;
+	
+	left: 0;
+	top: 1px;
+	
+	border: solid 1px #999999;
+	border-radius: 2px;
+
+	height: 9px;
+	width: 9px;
+
+	font-family: "Courier New", Courier, monospace;
+	font-size: 13px;
+	line-height: 9px;
+	text-align: center;
+	color: #000000;
+	cursor: pointer;
+
+	background: #fcfff4;
+	background: -moz-linear-gradient(top, #fcfff4 0%, #dfe5d7 40%, #b3bead 100%);
+	background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#fcfff4), color-stop(40%,#dfe5d7), color-stop(100%,#b3bead));
+	background: -webkit-linear-gradient(top, #fcfff4 0%,#dfe5d7 40%,#b3bead 100%);
+	background: -ms-linear-gradient(top, #fcfff4 0%,#dfe5d7 40%,#b3bead 100%);
+	background: linear-gradient(to bottom, #fcfff4 0%,#dfe5d7 40%,#b3bead 100%);
+}
+
+.watch-name {
+}
+
+.watch-null {
+	color: #666666;
+	font-style: italic;
+}
+
+.watch-number {
+	color: #000099;	
+}
+
+.watch-boolean {
+	color: #000033;
+}
+
+.watch-string {
+	font-family: "Courier New", Courier, monospace;
+	color: #FF0000;
+}
+
+.watch-key-array {
+	color: #6666FF;
+	font-weight: bold;
+}
+
+.watch-key-class {
+	color: #000033;
+	font-weight: bold;
+	font-style: italic;
+}
+
+.watch-key-function {
+	color: #006600;
+	font-style: italic;
+}
+
+.watch-array {
+	font-family: "Courier New", Courier, monospace;
+}
+
+.watch-object {
+	color: #006633;
+	font-weight: bold;
+}
+
+.watch-function {
+	color: #006633;
+	font-weight: bold;
+	font-style: italic;
+}
+
+.watch-class {
+	color: #000066;
+	font-weight: bold;
+}
+
+.watch-arraymore {
+	font-weight: bold;
+	color:#333333;
+}
+
+.watch-short-key {
+	color: #006633;
+	font-weight: bold;	
+}
