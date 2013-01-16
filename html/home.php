@@ -1,5 +1,5 @@
 <?php
-define('VERSION', '0.1');
+define('VERSION', '0.2');
 
 session_start();
 $_SESSION['list'] = (array)$_SESSION['list'];

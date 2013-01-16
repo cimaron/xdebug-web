@@ -116,7 +116,12 @@
 
 .watch-string {
 	font-family: "Courier New", Courier, monospace;
+	white-space: pre;
 	color: #FF0000;
+}
+
+.watch-string-short {
+	white-space: inherit;
 }
 
 .watch-key-array {
@@ -157,10 +162,21 @@
 
 .watch-arraymore {
 	font-weight: bold;
-	color:#333333;
+	color:#666666;
 }
 
 .watch-short-key {
 	color: #006633;
 	font-weight: bold;	
 }
+
+.watch-protected {
+	color: #339933;
+	font-style: italic;
+}
+
+.watch-private {
+	color: #999999;
+	font-style: italic;
+}
+

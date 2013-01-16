@@ -25,7 +25,9 @@
 	}
 
 	$().ready(resize);
+	$(window).resize(resize);	
     $('#tab_console').on('shown', resize)
+
     $('#tab_console').on('shown', shown)
 
 	Debugger.clear_console = function() {

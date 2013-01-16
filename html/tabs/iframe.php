@@ -22,7 +22,8 @@
 	}
 
 	$().ready(resize);
-    $('#tab_iframe').on('shown', resize)
+	$(window).resize(resize);
+	$('#tab_iframe').on('shown', resize)
 
 	Debugger.reloadWindow = function(form) {
 		$('#windowPane').attr('src', $('#windowPane').attr('src'));

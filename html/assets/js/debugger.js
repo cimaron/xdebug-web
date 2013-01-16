@@ -4,6 +4,8 @@
 
 Debugger = {
 	
+	version : '0.2',
+	
 	uid : 0,
 	
 	options : {
@@ -69,16 +71,6 @@ Debugger = {
 		}
 	},
 	
-	toggleWatch : function(el, uid) {
-		if ($(el).html() == '+') {
-			$('.watch_child_' + uid).show();
-			$(el).html('-');
-		} else {
-			$('.watch_child_' + uid).hide();
-			$(el).html('+');
-		}
-	},
-
 	/**
 	 * Update local variables action
 	 */
@@ -130,13 +122,13 @@ Debugger = {
 	},
 
 	action_log : function(data) {
-		if (typeof data == 'object') {
+		//if (typeof data == 'object') {
 			var uid = this.uid++;
 			$('#console-container').append('<div class="watch" id="console-' + uid + '" />');
 			this.updateWatch('console-' + uid, {object:data});
-		} else {
-			$('#console-container').append('<div>' + data + '</div>');	
-		}
+		//} else {
+		//	$('#console-container').append('<div>' + data + '</div>');	
+		//}
 
 		if (!$($('#tab_console')[0].parentNode).hasClass('active')) {
 			var count = 0;
@@ -153,42 +145,88 @@ Debugger = {
 	},
 	
 	updateWatch : function(id, data, append) {
-		var vars = this.makeTree(data);
 
-		var out = '<table width="100%">';
-		for (var i = 0; i < vars.length; i++) {
-			var node = vars[i];
-			out += this.treeHtml(node, '');
-		}
-
+		var table = $('<table width="100%" />');
 		if (append) {
-			$('#' + id).append(out);
+			$('#' + id).append(table);
 		} else {
-			$('#' + id).html(out);			
+			$('#' + id).html(table);
 		}
+
+		var tree = this.makeTree(data);
+		for (var i = 0; i < tree.length; i++) {
+			table.append(this.treeHtml(tree[i], 0));
+		}
+	},
+
+	/**
+	 *
+	 */
+	toggleWatch : function(el) {
+
+		var my_class, state, button;
+
+		my_class = el.id;
+		el = $(el).closest('tr.watch_row')[0];
+		button = $(el).find('.watch-toggle');
+
+		state = button.html() == '+';
+
+		if (state) {
+			button.html('-');
+			$(el).removeClass('inactive').addClass('active');
+		} else {
+			button.html('+');
+			$(el).removeClass('active').addClass('inactive');			
+		}
+
+		this.toggleChildren(el, state);
+	},
+
+	/**
+	 *
+	 */
+	toggleChildren : function(el, state) {
+
+		var child_class = el.id + '_child';
+		var children = $('.' + child_class);
+
+		children.each(function(i, el) {
+			if (state) {
+				$(el).css('display', 'table-row');	
+			} else {
+				$(el).css('display', 'none');	
+			}
+
+			if (!state || $(el).hasClass('active')) {
+				Debugger.toggleChildren(el, state);
+			}
+		});
 	},
 
 	treeHtml : function(tree, depth, parentid) {
 		var out = "";
 		var uid = this.uid++;
-		
-		if (depth == '') {
-			depth = 0;	
-		}
+
 		var indent = depth * 20  + 10;
 
 		if (depth == 0) {
-			out += '<tr class="watch_child_' + parentid + ' watch-top">';
+			out += '<tr class="watch_row watch_row_' + uid + ' watch-top inactive" id="watch_row_' + uid + '">';
 		} else {
-			out += '<tr class="watch_child_' + parentid + '" style="display:none;">';			
+			out += '<tr class="watch_row watch_row_' + uid + ' watch_row_' + parentid + '_child inactive" id="watch_row_' + uid + '" style="display:none">';
 		}
 		
+		out += '<td style="padding-left:' + indent + 'px;"><span>';
 		if (tree.children.length) {
-			out += '<td style="padding-left:' + indent + 'px;"><span><span class="watch-toggle" onclick="Debugger.toggleWatch(this, \'' + uid + '\');">+</span> <span class="watch-name">' + tree.name + '</span></span></td>';
-		} else {
-			out += '<td style="padding-left:' + indent + 'px;"><span><span class="watch-name">' + tree.name + '</span></span></td>';
+			out += '<span class="watch-toggle" onclick="Debugger.toggleWatch(this);">+</span>';
 		}
+		out += '<span><span class="watch-name">' + tree.name + '</span></span></td>';
 		out += '<td>' + tree.display + '</td>';
+		
+		if (depth == 0) {
+			out += '<td class="watch-close"><span>&times;</span></td>';	
+		}
+		
 		out += '</tr>';
 
 		for (var i = 0; i < tree.children.length; i++) {
@@ -227,6 +265,16 @@ Debugger = {
 
 			name = i;
 
+			var matched;
+			if (data instanceof Object && (matched = i.match(/([px])(.+):(.+)/))) {
+				if (matched[1] == 'p') {
+					name = '<span class="watch-protected">' + matched[3] + '</span>';				
+				} else {
+					name = '<span class="watch-private">' + matched[3] + '</span>';						
+				}
+				i = matched[3];
+			}
+
 			//get html by type
 			switch (type) {
 
@@ -248,16 +296,21 @@ Debugger = {
 				case 'string':
 					value = this.makeString(value);
 					var full = '<span class="watch-string">"' + value + '"</span>';
+					var short_str;
 
 					if (value.length > 63) {
-						display = '<span class="watch-string">"' + value.substr(0, 30) + ' &hellip; ' + value.substr(value.length - 30) + '"</span>';
+						short_str = value.substr(0, 30) + ' &hellip; ' + value.substr(value.length - 30);
+						short_str = short_str.replace(/\s/, '&nbsp;');
+						display = '<span class="watch-string watch-string-short">"' + short_str + '"</span>';
 						children = [{name:"", display : full, children : []}];
 					} else {
 						display = full;
 					}
 
-					if (value.length > 8) {
-						short = '<span class="watch-string">"' + value.substr(0, 4) + ' &hellip; ' + value.substr(value.length - 4) + '"</span>';
+					if (value.length > 12) {
+						short_str = value.substr(0, 4) + ' &hellip; ' + value.substr(value.length - 4);
+						short_str = short_str.replace(/\s/, '&nbsp;');
+						short = '<span class="watch-string watch-string-short">"' + short_str + '"</span>';
 					} else {
 						short = full;
 					}
@@ -318,7 +371,7 @@ Debugger = {
 			if (data instanceof Array) {
 				name = '<span class="watch-key-array">' + i + '</span>';				
 			}
-
+			
 			tree.push({
 				key : i,
 				name : name,

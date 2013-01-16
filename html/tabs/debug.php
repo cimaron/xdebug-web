@@ -60,7 +60,7 @@
 				<a href="#defines" data-toggle="tab">Defines</a>
 			</li>
 			<li>
-				<a href="#trace" data-toggle="tab">Trace</a>
+				<a href="#trace" data-toggle="tab">Stack</a>
 			</li>
 		</ul>
 	
@@ -97,11 +97,19 @@
 	}
 
 	$().ready(resize);
+	$(window).resize(resize);
+	
+    $('#tab_debug').on('shown', resize)
+
+	$('#info_container .nav-tabs a').on('shown', function() {
+		var tab = $(this).attr('href').substr(1);
+		Debugger.action('get', tab);
+	});
+
 	$().ready(function() {
 		//Reenable when bug with tooltip and btn-group is fixed in bootstrap
 		//$('#debug-buttons .btn').tooltip({placement:'bottom'});
 	});
-    $('#tab_debug').on('shown', resize)
 
 	Debugger.addWatch = function(el) {
 		var val = $(el).val();

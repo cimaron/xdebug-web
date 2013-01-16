@@ -132,6 +132,9 @@ class DbgQueueWriter {
 		//$str = gzcompress(serialize($queue));
 		$str = serialize($queue);
 
+		$str = preg_replace('#\x0\*\x0#', "pt:", $str);
+		$str = preg_replace('#\x0([a-zA-Z0-9_]+)\x0#', 'x$1:', $str);
+
 		ftruncate($this->fh, 0);
 		$result = fwrite($this->fh, $str);
 
