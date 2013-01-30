@@ -1,5 +1,5 @@
 <?php
-define('VERSION', '0.2');
+include dirname(__FILE__) . '/include/config.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">

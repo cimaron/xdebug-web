@@ -122,13 +122,16 @@ Debugger = {
 	},
 
 	action_log : function(data) {
-		//if (typeof data == 'object') {
-			var uid = this.uid++;
-			$('#console-container').append('<div class="watch" id="console-' + uid + '" />');
-			this.updateWatch('console-' + uid, {object:data});
-		//} else {
-		//	$('#console-container').append('<div>' + data + '</div>');	
-		//}
+
+		var uid = this.uid++;
+		$('#console-container').append('<div class="watch" id="console-' + uid + '" />');
+		var watch = {};
+		watch.name = '';
+		watch.type = 'object';
+		watch.className = 'object';
+		watch.children = [data];
+
+		this.updateWatch('console-' + uid, watch);
 
 		if (!$($('#tab_console')[0].parentNode).hasClass('active')) {
 			var count = 0;
@@ -154,8 +157,8 @@ Debugger = {
 		}
 
 		var tree = this.makeTree(data);
-		for (var i = 0; i < tree.length; i++) {
-			table.append(this.treeHtml(tree[i], 0));
+		for (var i = 0; i < tree.children.length; i++) {
+			table.append(this.treeHtml(tree.children[i], 0));
 		}
 	},
 
@@ -192,13 +195,16 @@ Debugger = {
 		var children = $('.' + child_class);
 
 		children.each(function(i, el) {
+			
 			if (state) {
 				$(el).css('display', 'table-row');	
 			} else {
 				$(el).css('display', 'none');	
 			}
 
-			if (!state || $(el).hasClass('active')) {
+			var active = $(el).hasClass('active');
+
+			if (active) {
 				Debugger.toggleChildren(el, state);
 			}
 		});
@@ -239,149 +245,151 @@ Debugger = {
 	makeString : function(str) {
 		return jQuery('<div />').text(str).html();
 	},
-
+	
 	makeTree : function(data) {
-		var tree = [], display, short, children, name;
 
-		for (var i in data) {
-			var value = data[i];
+		var node = {};
 
-			display = value;
-			short = value;
-			children = [];
+		//value display
+		node.display = data;
+		node.short = data;
+		node.name = data.name;
 
-			//Determine type
-			var type = typeof value;
-			if (type == 'object' && value === null) {
-				type = 'null';
+		//
+		node.children = [];
+		for (var i in data.children) {
+			node.children[i] = this.makeTree(data.children[i]);
+			if (data.type == 'array') {
+				node.children[i].name = '<span class="watch-key-array">' + node.children[i].name + '</span>';
 			}
-			if (type == 'object' && value instanceof Array) {
-				type = 'array';	
-			}
-			if (type == 'object' && value.__PHP_Type) {
-				type = value.__PHP_Type;
-				delete value.__PHP_Type;
-			}
-
-			name = i;
-
-			var matched;
-			if (data instanceof Object && (matched = i.match(/([px])(.+):(.+)/))) {
-				if (matched[1] == 'p') {
-					name = '<span class="watch-protected">' + matched[3] + '</span>';				
-				} else {
-					name = '<span class="watch-private">' + matched[3] + '</span>';						
-				}
-				i = matched[3];
-			}
-
-			//get html by type
-			switch (type) {
-
-				case 'null':
-					display = '<span class="watch-null">null</span>';
-					short = display;
-					break;
-
-				case 'boolean':
-					display = '<span class="watch-boolean">' + value + '</span>';
-					short = display;
-					break;
-
-				case 'number':
-					display = '<span class="watch-number">' + value + '</span>';
-					short = display;
-					break;
-
-				case 'string':
-					value = this.makeString(value);
-					var full = '<span class="watch-string">"' + value + '"</span>';
-					var short_str;
-
-					if (value.length > 63) {
-						short_str = value.substr(0, 30) + ' &hellip; ' + value.substr(value.length - 30);
-						short_str = short_str.replace(/\s/, '&nbsp;');
-						display = '<span class="watch-string watch-string-short">"' + short_str + '"</span>';
-						children = [{name:"", display : full, children : []}];
-					} else {
-						display = full;
-					}
-
-					if (value.length > 12) {
-						short_str = value.substr(0, 4) + ' &hellip; ' + value.substr(value.length - 4);
-						short_str = short_str.replace(/\s/, '&nbsp;');
-						short = '<span class="watch-string watch-string-short">"' + short_str + '"</span>';
-					} else {
-						short = full;
-					}
-
-					break;
-				
-				case 'array':
-
-					children = this.makeTree(value);
-					display = [];
-					for (var j = 0; j < children.length && j < 3; j++) {
-						display.push(children[j].short);
-					}
-					if (j < children.length) {
-						display.push('<span class="watch-arraymore">' + (children.length - j) + ' more&hellip;</span>');	
-					}
-					display = '<span class="watch-array">[</span> ' + display.join(", ") + ' <span class="watch-array">]</span>';
-					short = '<span class="watch-object">Array</span>';
-					break;
-				
-				case 'object':
-					var classname = 'object';
-					if (value.__PHP_Incomplete_Class_Name) {
-						classname = value.__PHP_Incomplete_Class_Name;
-						delete value.__PHP_Incomplete_Class_Name;
-					}
-
-					children = this.makeTree(value);
-					display = [];
-					for (var j = 0; j < children.length && j < 3; j++) {
-						display.push('<span class="watch-short-key">' + children[j].key + '=</span>' + children[j].short);
-					}
-					if (j < children.length) {
-						display.push('<span class="watch-arraymore">more&hellip;</span>');	
-					}
-					display = '<span class="watch-object">' + classname + ' {</span> ' + display.join(", ") + ' <span class="watch-object">}</span>';
-					short = '<span class="watch-object">{&hellip;}</span>';
-					break;
-
-				case 'function':
-					name = '<span class="watch-key-function">' + i + '</span>';
-					display = '<span class="watch-function">function()</span>';
-					short = 'function';
-					children = this.makeTree(value);
-					break;
-
-				case 'class':
-					name = '<span class="watch-key-class">' + i + '</span>';
-					display = '<span class="watch-class">Class</span>';
-					short = 'Class';
-					children = this.makeTree(value);
-					break;
-
-				default:
-					display = value;
-			}
-
-			if (data instanceof Array) {
-				name = '<span class="watch-key-array">' + i + '</span>';				
-			}
-			
-			tree.push({
-				key : i,
-				name : name,
-				display : display,
-				children : children,
-				short : short
-			});
 		}
 
-		return tree;
+		if (data.access == 'protected') {
+			node.name = '<span class="watch-protected">' + node.name + '</span>';			
+		}
+
+		if (data.access == 'private') {
+			node.name = '<span class="watch-private">' + node.name + '</span>';			
+		}
+		
+		if (data.extension) {
+			node.name = '<span class="watch-extension">' + node.name + '</span>';	
+		}
+
+		//get html by type
+		switch (data.type) {
+
+			case 'NULL':
+				node.display = '<span class="watch-null">null</span>';
+				node.short = node.display;
+				break;
+
+			case 'boolean':
+				node.display = '<span class="watch-boolean">' + data.value + '</span>';
+				node.short = node.display;
+				break;
+
+			case 'integer':
+			case 'double':
+				node.display = '<span class="watch-number">' + data.value + '</span>';
+				node.short = node.display;
+				break;
+
+			case 'string':
+				var value = this.makeString(data.value);
+				var full = '<span class="watch-string">"' + value + '"</span>';
+				var short_str;
+
+				if (value.length > 63) {
+					node.children = [{name : "", display : full, children : []}];
+					short_str = value.substr(0, 30) + ' &hellip; ' + value.substr(value.length - 30);
+					short_str = short_str.replace(/\s/, '&nbsp;');
+					node.display = '<span class="watch-string watch-string-short">"' + short_str + '"</span>';
+				} else {
+					node.display = full;
+				}
+
+				if (value.length > 12) {
+					short_str = value.substr(0, 8) + ' &hellip; ';
+					short_str = short_str.replace(/\s/, '&nbsp;');
+					node.short = '<span class="watch-string watch-string-short">"' + short_str + '"</span>';
+				} else {
+					node.short = full;
+				}
+
+				break;
+
+			case 'resource':
+				node.display = '<span class="watch-object">Resource ( ' + data.res_type + '</span>, <span class="watch-object">' + data.value + ' )</span>';
+				node.short = node.display;
+				break;
+
+			case 'hash':
+			
+				var display = [];
+				for (var j = 0; j < node.children.length && j < 3; j++) {
+					display.push('<span class="watch-short-key">' + node.children[j].name + '=</span>' + node.children[j].short);
+				}
+
+				if (j < data.total) {
+					display.push('<span class="watch-arraymore">' + (data.total - j) + ' more&hellip;</span>');	
+				}
+
+				node.display = '<span class="watch-array">{</span> ' + display.join(", ") + ' <span class="watch-array">}</span>';
+				node.short = '<span class="watch-object">Array</span>';
+			
+				break;
+
+			case 'array':
+
+				var display = [];
+				for (var j = 0; j < node.children.length && j < 3; j++) {
+					display.push(node.children[j].short);					
+				}
+
+				if (j < data.total) {
+					display.push('<span class="watch-arraymore">' + (data.total - j) + ' more&hellip;</span>');	
+				}
+
+				node.display = '<span class="watch-array">[</span> ' + display.join(", ") + ' <span class="watch-array">]</span>';
+				node.short = '<span class="watch-object">Array</span>';
+
+				break;
+
+			case 'object':
+
+				var classname = data.classname;
+
+				var display = [];
+				for (var j = 0; j < node.children.length && j < 3; j++) {
+					display.push('<span class="watch-short-key">' + node.children[j].name + '=</span>' + node.children[j].short);
+				}
+
+				if (j < node.children.length) {
+					display.push('<span class="watch-arraymore">more&hellip;</span>');	
+				}
+
+				node.display = '<span class="watch-object">' + classname + ' {</span> ' + display.join(", ") + ' <span class="watch-object">}</span>';
+				node.short = '<span class="watch-object">{&hellip;}</span>';
+				break;
+
+			case 'function':
+				node.name = '<span class="watch-key-function">' + node.name + '</span>';
+				node.display = '<span class="watch-function">function()</span>';
+				node.short = '<span class="watch-function">function()</span>';
+				break;
+
+			case 'class':
+				node.name = '<span class="watch-key-class">' + node.name + '</span>';
+				node.display = '<span class="watch-class">Class</span>';
+				node.short = 'Class';
+				break;
+
+			default:
+				node.display = data.value;
+		}
+
+		return node;
 	}
 
 };

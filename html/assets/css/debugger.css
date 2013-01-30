@@ -116,7 +116,7 @@
 
 .watch-string {
 	font-family: "Courier New", Courier, monospace;
-	white-space: pre;
+	white-space: pre-wrap;
 	color: #FF0000;
 }
 

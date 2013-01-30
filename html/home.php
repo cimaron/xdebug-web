@@ -1,5 +1,5 @@
 <?php
-define('VERSION', '0.2');
+include dirname(__FILE__) . '/include/config.php';
 
 session_start();
 $_SESSION['list'] = (array)$_SESSION['list'];
