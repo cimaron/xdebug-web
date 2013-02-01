@@ -114,6 +114,11 @@
 	color: #000033;
 }
 
+.watch-string:before,
+.watch-string:after {
+	content: '"';
+}
+
 .watch-string {
 	font-family: "Courier New", Courier, monospace;
 	white-space: pre-wrap;
@@ -177,6 +182,25 @@
 
 .watch-private {
 	color: #999999;
+	font-style: italic;
+}
+
+.watch-file {
+	color: #0000FF;
+	font-weight: bold;
+	cursor: pointer;
+}
+
+.watch-file:hover {
+	text-decoration: underline;
+}
+
+.watch-comment, .watch-comment-name {
+	color: #CC6600;
+}
+
+.watch-comment {
+	font-family: "Courier New", Courier, monospace;
 	font-style: italic;
 }
 

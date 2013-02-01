@@ -11,11 +11,14 @@ Debugger = {
 	options : {
 		srcId : 'src',
 	},
-	
+
+	connected : {},
+
 	/**
 	 * Send action to client
 	 */
 	action : function(action, data) {
+		console.log('sent', action, data);
 		$.ajax({
 			url : "action.php",
 			type : 'post',
@@ -50,7 +53,7 @@ Debugger = {
 			url : "update.php",
 			dataType : 'json',
 			complete : function(xhr, status) {
-				setTimeout(Debugger.updater, 2000);
+				setTimeout(Debugger.updater, 0);
 			},
 			success : function(data, xhr) {
 				Debugger.update(data);
@@ -65,12 +68,38 @@ Debugger = {
 	update : function(data) {
 		for (var i = 0; i < data.length; i++) {
 			var msg = data[i];
+			console.log('got', msg);
+			if (msg.init) {
+				this.handleInit(msg.init);	
+			} else if (msg.close) {
+				this.handleClose(msg);	
+			}
+
 			if (typeof this['action_' + msg.action] == 'function') {
 				this['action_' + msg.action](msg.data);	
 			}
 		}
 	},
-	
+
+	/**
+	 * Handle debugger init packet
+	 *
+	 * @param   object   init   Init packet
+	 */
+	handleInit : function(init) {
+		this.connected[init.thread] = init;
+		init.features = [];
+	},
+
+	/**
+	 * Handle debugger close packet
+	 *
+	 * @param   object   close   Close packet
+	 */
+	handleClose : function(close) {
+		delete this.connected[close.thread];
+	},
+
 	/**
 	 * Update local variables action
 	 */
@@ -147,6 +176,12 @@ Debugger = {
 		
 	},
 	
+	action_describe : function(data) {
+		var row = this.replaceWatch(data[1], data[0]);
+		var button = $(row).find('.watch-toggle');
+		this.toggleWatch(button);
+	},
+	
 	updateWatch : function(id, data, append) {
 
 		var table = $('<table width="100%" />');
@@ -162,25 +197,45 @@ Debugger = {
 		}
 	},
 
+	replaceWatch : function(id, data) {
+		
+		var table = $('<table width="100%" />');
+
+		var tree = this.makeTree(data);
+		table.append(this.treeHtml(tree, 0));
+		
+		var rows = $(table).find('tr.watch_row');
+
+		$('.' + id + '_child').remove();
+		var me = $('.' + id);
+		me.after(rows);
+		me.remove();
+
+		return rows[0];
+	},
+
 	/**
 	 *
 	 */
-	toggleWatch : function(el) {
+	toggleWatch : function(button) {
+		var state, el, reload;
 
-		var my_class, state, button;
+		el = $(button).closest('tr.watch_row')[0];
 
-		my_class = el.id;
-		el = $(el).closest('tr.watch_row')[0];
-		button = $(el).find('.watch-toggle');
-
-		state = button.html() == '+';
+		state = $(button).html() == '+';
 
 		if (state) {
-			button.html('-');
+			$(button).html('-');
 			$(el).removeClass('inactive').addClass('active');
 		} else {
-			button.html('+');
+			$(button).html('+');
 			$(el).removeClass('active').addClass('inactive');			
+		}
+
+		reload = $(el).find('.describe')[0];
+		if (reload) {
+			var ctx = $(reload).attr('rel');
+			this.action('describe', ctx + ' ' + el.id);
 		}
 
 		this.toggleChildren(el, state);
@@ -291,20 +346,28 @@ Debugger = {
 
 			case 'integer':
 			case 'double':
-				node.display = '<span class="watch-number">' + data.value + '</span>';
+				var value = data.value;
+				if (data.value == 'Infinity') {
+					value = Infinity;
+				}
+				if (data.value == 'NaN') {
+					value = NaN;	
+				}
+	
+				node.display = '<span class="watch-number">' + value + '</span>';
 				node.short = node.display;
 				break;
 
 			case 'string':
 				var value = this.makeString(data.value);
-				var full = '<span class="watch-string">"' + value + '"</span>';
+				var full = '<span class="watch-string">' + value + '</span>';
 				var short_str;
 
 				if (value.length > 63) {
 					node.children = [{name : "", display : full, children : []}];
 					short_str = value.substr(0, 30) + ' &hellip; ' + value.substr(value.length - 30);
 					short_str = short_str.replace(/\s/, '&nbsp;');
-					node.display = '<span class="watch-string watch-string-short">"' + short_str + '"</span>';
+					node.display = '<span class="watch-string watch-string-short">' + short_str + '</span>';
 				} else {
 					node.display = full;
 				}
@@ -312,11 +375,27 @@ Debugger = {
 				if (value.length > 12) {
 					short_str = value.substr(0, 8) + ' &hellip; ';
 					short_str = short_str.replace(/\s/, '&nbsp;');
-					node.short = '<span class="watch-string watch-string-short">"' + short_str + '"</span>';
+					node.short = '<span class="watch-string watch-string-short">' + short_str + '</span>';
 				} else {
 					node.short = full;
 				}
 
+				break;
+
+			case 'file':
+				var full = '<span class="watch-file">' + data.value.file + ' (line ' + data.value.line + ')</span>';
+
+				var onclick = "Debugger.action('source', '" + data.value.file.replace(/("')/, '\\$1') + " " + data.value.line + "')";
+				node.display = '<span class="watch-file" onclick="' + onclick + '">' + data.value.name + ' (line ' + data.value.line + ')</span>';
+				node.short = node.display;
+				node.children.unshift({name : "", display : full, children : []});
+				break;
+
+			case 'comment':
+				var value = this.makeString(data.value);
+				node.name = '<span class="watch-comment-name">' + node.name + '</span>';	
+				node.display = '<span class="watch-comment">' + value + '</span>';
+				node.short = node.display;
 				break;
 
 			case 'resource':
@@ -325,7 +404,7 @@ Debugger = {
 				break;
 
 			case 'hash':
-			
+
 				var display = [];
 				for (var j = 0; j < node.children.length && j < 3; j++) {
 					display.push('<span class="watch-short-key">' + node.children[j].name + '=</span>' + node.children[j].short);
@@ -337,7 +416,7 @@ Debugger = {
 
 				node.display = '<span class="watch-array">{</span> ' + display.join(", ") + ' <span class="watch-array">}</span>';
 				node.short = '<span class="watch-object">Array</span>';
-			
+
 				break;
 
 			case 'array':
@@ -375,13 +454,23 @@ Debugger = {
 
 			case 'function':
 				node.name = '<span class="watch-key-function">' + node.name + '</span>';
-				node.display = '<span class="watch-function">function()</span>';
+				if (!node.children.length) {
+					node.display = '<span class="watch-function describe" rel="function ' + data.name + '">function()</span>';
+					node.children = [{name : "loading...", display : "", children : []}];
+				} else {
+					node.display = '<span class="watch-function">function()</span>';					
+				}
 				node.short = '<span class="watch-function">function()</span>';
 				break;
 
 			case 'class':
 				node.name = '<span class="watch-key-class">' + node.name + '</span>';
-				node.display = '<span class="watch-class">Class</span>';
+				if (!node.children.length) {
+					node.display = '<span class="watch-class describe" rel="class ' + data.name + '">Class</span>';
+					node.children = [{name : "loading...", display : "", children : []}];
+				} else {
+					node.display = '<span class="watch-class">Class</span>';
+				}
 				node.short = 'Class';
 				break;
 

@@ -1,44 +1,26 @@
 <?php
 
-require_once dirname(__FILE__) . '/../dbgp.php';
 
-class PHPDebuggerNode {
+require_once dirname(__FILE__) . '/dbgp.php';
+require_once dirname(__FILE__) . '/inspector.php';
+require_once dirname(__FILE__) . '/../include/dbgp.php';
 
-	public $name = '';
-	public $type = '';
-	public $value = NULL;
-	public $children = array();
-
-	public function __construct($name = '', $type = '', $value = NULL, $children = array()) {
-		$this->name = $name;
-		$this->type = $type;
-		$this->value = $value;
-		$this->children = $children;
-	}
-}
 
 /**
  * PHP Debugger
  */
 class PHPDebugger {
 
-	const COMMAND_HALT = 'halt';
-	const COMMAND_RESUME = 'resume';
-	const COMMAND_RELOAD = 'reload';
-	const COMMAND_EXEC = 'exec';
-	const COMMAND_GET = 'get';
-
 	protected $dbgp = NULL;
+	protected $inspector = NULL;
 
 	protected $watch = array();
 	protected $defines = array();
-
-	protected $dirty = array(
-		'local' => true,
-		'watch' => false,
-		'global' => true,
-		'trace' => true,
-	);
+	protected $stack = array();
+	protected $local = array();
+	protected $globals = array();
+	
+	protected $dirty = true;
 
 	protected $config = array(
 		'timeout' => 3600,   //one hour
@@ -71,16 +53,19 @@ class PHPDebugger {
 	public function __construct($config = array()) {
 	
 		$this->config = array_merge($this->config, $config);
-	
-		//header('Access-Control-Allow-Origin: ' . $this->config['domain']);
-	
 		$this->dbgp = new DBGp(DBGp::CTX_DEBUGGER);
+		$this->inspector = new PHPDebuggerInspector();
 
-		set_error_handler(array(get_class($this), 'error'));
+		$this->dbgp->sendData(DBGpPacket::init());
+
+		//set_error_handler(array(get_class($this), 'error'), E_ALL & ~E_NOTICE);
 	}
 
+	/**
+	 * Destructor
+	 */
 	public function __destruct() {
-		$this->dbgp->sendData('selectPane iframe');
+		$this->dbgp->sendData(DBGpPacket::close());
 	}
 
 	public function setConfig($key, $value) {
@@ -121,7 +106,8 @@ class PHPDebugger {
 	 */
 	public function log() {
 		foreach (func_get_args() as $data) {
-			$this->dbgp->sendData('log ' . json_encode($this->buildTree($data)));
+			$inspect = $this->inspector->inspect($data);
+			$this->dbgp->sendData(DBGpPacket::action('log', $inspect));
 		}
 	}
 
@@ -147,150 +133,20 @@ class PHPDebugger {
 		$vars = $newvars;
 	
 		if ($prepare) {
-			$tree = $this->buildTree($vars);
+			$tree = $this->inspector->inspect($vars);
 		} else {
 			$tree = $vars;
 		}
 
-		$this->dbgp->sendData($action . ' ' . json_encode($tree));
+		$this->dbgp->sendData(DBGpPacket::action($action, $tree));
 	}
 
 	/**
-	 * Parse DocComment style comment
+	 * Build defines/class/functions info
 	 *
-	 * @param   string   $comment   Raw comment
-	 *
-	 * @return  mixed
+	 * @return   object
 	 */
-	protected function _parseDocComment($comment) {
-
-		$clean = preg_match('#\s*/\*+(.*)\*/#s', $comment, $matches);
-		$clean = $matches[1];
-
-		$clean =  trim(preg_replace('/\r?\n *\* */', ' ', $comment));
-
-		preg_match_all('/@([a-z]+)\s+(.*?)\s*(?=$|@[a-z]+\s)/s', $clean, $matches);
-
-		if (count($matches[1]) == count($matches[2]) && count($matches[1]) > 0) {
-			$info = (object)array_combine($matches[1], $matches[2]);
-			$info->raw = $comment;
-		} else {
-			$info = $comment;
-		}
-
-		return $info;
-	}
-
-	/**
-	 * @param   string   $func   Function name
-	 */
-	protected function _getFunctionInfo($func, $ref = NULL) {
-
-		$node = new PHPDebuggerNode($func, 'function');
-
-		if (!$ref) {
-			$ref = new ReflectionFunction($func);
-		}
-
-		//Build comments
-		if ($ref->getDocComment()) {
-			$comment = $this->_parseDocComment($ref->getDocComment());
-			$node->children[] = $this->buildTree($comment, 'comments');
-		}
-
-		//Build params
-		$params = new PHPDebuggerNode('params', 'array');
-		foreach ($ref->getParameters() as $i => $param) {
-			$p = "$" . $param->name;
-			if (isset($param->isPassedByReference) && $param->isPassedByReference) {
-				$p = '&' . $p;
-			}
-			if (isset($param->isDefaultAvailable) && $param->isDefaultAvailable) {
-				$p .= ' = ' . (string)$param->getDefaultValue();
-			}
-			if (isset($param->isOptional) && $param->isOptional) {
-				$p = '[ ' . $p . ' ]';
-			}
-			
-			$params->children[] = new PHPDebuggerNode($i, 'string', $p);
-		}
-		$node->children[] = $params;
-
-		//Get extension
-		if ($ref->getExtensionName()) {
-			$node->extension = $ref->getExtensionName();
-			$node->children[] = new PHPDebuggerNode('extension', 'string', $node->extension);
-		}
-
-		if (!$ref->isInternal()) {
-			$node->children[] = new PHPDebuggerNode('file', 'string', $ref->getFileName());
-			$node->children[] = new PHPDebuggerNode('line', 'integer', $ref->getStartLine());
-		}
-
-		return $node;
-	}
-
-	/**
-	 * Get Class info
-	 *
-	 * @param   string   $class   Class info
-	 */
-	public function describeClass($class) {
-
-		$node = new PHPDebuggerNode($class, 'class');
-
-		$ref = new ReflectionClass($class);
-
-		if (!$ref->isUserDefined()) {
-			//return false;
-		}
-
-
-		//Build comments
-		if ($ref->getDocComment()) {
-			$comment = $this->_parseDocComment($ref->getDocComment());
-			$node->children[] = $this->buildTree($comment, 'comments');
-		}
-
-		//get constants
-		if ($ref->getConstants()) {
-			$constants = new PHPDebuggerNode('constants', 'hash');
-			$node->children[] = $constants;
-			foreach ($ref->getConstants() as $name => $value) {
-				$constants->children[] = $this->buildTree($value, $name);
-			}
-		}
-
-		if ($ref->isUserDefined()) {
-			$node->user = true;
-		}
-
-		//Get extension
-		if ($ref->getExtensionName()) {
-			$node->extension = $ref->getExtensionName();
-			$node->children[] = new PHPDebuggerNode('extension', 'string', $node->extension);
-		}
-
-		//get methods
-		$methods = $ref->getMethods();
-		if (count($methods)) {			
-			foreach ($methods as $method) {
-				$node->children[] = $this->_getFunctionInfo($method->getName(), $method);
-			}
-		}
-
-		if (!$ref->isInternal()) {
-			$node->children[] = new PHPDebuggerNode('file', 'string', $ref->getFileName());
-			$node->children[] = new PHPDebuggerNode('line', 'integer', $ref->getStartLine());
-		}
-
-		return $node;
-	}
-
-	/**
-	 * Get defined info
-	 */
-	protected function _getDefined() {
+	protected function buildDefines() {
 
 		//define root nodes
 		$defined = new PHPDebuggerNode('', 'hash');
@@ -301,7 +157,7 @@ class PHPDebugger {
 		$consts = get_defined_constants(true);
 		foreach ($consts as $key => $list) {
 
-			$list = $this->buildTree($list);
+			$list = $this->inspector->inspect($list);
 
 			if ($key == 'user') {
 				$defined->children += $list->children;
@@ -319,7 +175,7 @@ class PHPDebugger {
 		foreach ($funcs as $type => $list) {
 			foreach ($list as $func) {
 
-				$node = $this->_getFunctionInfo($func);
+				$node = $this->inspector->describeFunction($func, NULL, false);
 				$ext = isset($node->extension) ? $node->extension : NULL;
 
 				if ($type == 'user') {
@@ -339,7 +195,7 @@ class PHPDebugger {
 		$classes = get_declared_classes();
 		foreach ($classes as $class) {
 
-			$node = $this->describeClass($class);
+			$node = $this->inspector->describeClass($class, false);
 			$ext = isset($node->extension) ? $node->extension : NULL;
 
 			if (isset($node->user) && $node->user) {
@@ -386,87 +242,96 @@ class PHPDebugger {
 
 		$stack = array();
 
+		$node = new PHPDebuggerNode('', 'array');
+
 		foreach ($trace as $i => $tr) {
 
-			$tr = (object)$tr;
-			$trace[$i] = $tr;
-
-			unset($tr->args);
-
-			$index = $i;
-
-			/*
-			if (isset($tr->file) && file_exists($tr->file)) {
-				$tr->source = file_get_contents($tr->file);
+			$name = $i;
+			if ($tr['function']) {
+				$name = $tr['function'] . '()';
 			}
-			*/
-
-			if (isset($tr->file)) {
-				$index = basename($tr->file);
+			if ($tr['class']) {
+				$name = $tr['class'] . $tr['type'] . $name;
 			}
 
-			if (isset($tr->line)) {
-				$index .= ':' . $tr->line;
+			$frame = new PHPDebuggerNode($name, 'file');
+			$node->children[] = $frame;
+
+			if ($tr['file']) {
+				$file = array(
+					'file' => $tr['file'],
+					'line' => $tr['line'],
+					'name' => basename($tr['file']),
+				);
+				$frame->value = $file;
 			}
-			
-			$stack[$index] = $tr;
+
+			if ($tr['object']) {
+				$frame->children[] = $this->inspector->inspect($tr['object'], '$this');
+			}
+
+			if ($tr['args']) {
+				foreach ($tr['args'] as $k => $v) {
+					$frame->children[] = $this->inspector->inspect($v, $k);
+				}
+			}
 		}
 
-		if (isset($trace[0]->file) && file_exists($trace[0]->file)) {
-			$trace[0]->source = file_get_contents($trace[0]->file);
-		} else {
-			$trace[0]->source = '';
-		}
-
-		if (!isset($trace[0]->line)) {
-			$trace[0]->line = 0;
-		}
-		
-		return $stack;
+		return $node;
 	}
 
 	/**
-	 * Break script
+	 * Execute breakpoint
+	 *
+	 * @param   object   $THIS    Current object scope
+	 * @param   array    $vars    Current scope local variables
+	 * @param   array    $trace   Current scope backtrace
+	 * @param   bool     $new     New breakpoint, or false if continuing same breakpoint
 	 */
-	public function pauseScript($THIS, $vars = array(), $trace = array(), $new = true) {
+	public function breakpoint($THIS, $vars = array(), $trace = array(), $new = true) {
 
 		if (!$this->config['active']) {
 			return;
 		}
 
 		if ($new) {
-			$this->dirty['local'] = true;
-			$this->dirty['watch'] = true;
-			$this->dirty['global'] = true;
-			$this->dirty['defined'] = true;
-			$this->dirty['trace'] = true;
-			$this->dbgp->sendData('selectPane debug');
+			$this->dirty = true;
+			$this->defines = $this->buildDefines();
 
-			$this->defines = $this->_getDefined();
-		}
-
-		if ($this->dirty['local']) {
+			//prepare local
 			ksort($vars);
 			if ($THIS) {
 				$vars = array('this' => $THIS) + $vars;
 			} else {
 				unset($vars['GLOBALS']);
 			}
-			$this->_sendVars('updateLocal', $vars, '$');
-			$this->dirty['local'] = false;
-		}
+			$this->local = $vars;
+			$this->send('local');
 
-		if ($this->dirty['watch']) {
-			$this->_sendVars('updateWatch', $this->watch);
-			$this->dirty['watch'] = false;
-		}
-
-		if ($this->dirty['trace']) {
+			//prepare stack
 			$stack = $this->getStack($trace);
-			$this->dbgp->sendData('updateTrace ' . json_encode($this->buildTree($stack)));
-			$this->dbgp->sendData('updateSource ' . json_encode(array('text' => $trace[0]->source, 'line' => $trace[0]->line)));
-			$this->dirty['trace'] = false;
+			$this->dbgp->sendData(DBGpPacket::action('updateTrace', $stack));
+
+			$src = $trace[0]->source;
+			$line = $trace[0]->line;
+			if (file_exists($src)) {
+				$text = file_get_contents($src);
+			} else {
+				$text = false;
+			}
+
+			$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => $text, 'line' => $line)));
+
+			$this->dbgp->sendData(DBGpPacket::action('selectPane', 'debug'));
 		}
+
+		return $this->pause();
+	}
+
+	/**
+	 * Execute paused wait loop
+	 */
+	protected function pause() {
 
 		//one hour break limit
 		$start = time();	
@@ -482,22 +347,46 @@ class PHPDebugger {
 
 				switch ($msg[0]) {
 
-					case self::COMMAND_HALT:
+					case 'halt':
 						die("Terminated by debugger");
 
-					case self::COMMAND_RELOAD:
+					case 'reload':
 						/*echo '<script type="text/javascript">location.reload();</script>';*/
 						break;
 
-					case self::COMMAND_EXEC:
+					case 'exec':
 						return array($msg[1]);
 						break;
 
-					case self::COMMAND_RESUME:
+					case 'resume':
 						return array();
 
-					case self::COMMAND_GET:
-						$this->sendGet($msg[1]);
+					case 'get':
+						$this->send($msg[1]);
+						break;
+
+					case 'describe':
+						list($ctx, $name, $return) = explode(' ', $msg[1]);
+
+						if ($ctx == 'class') {
+							$node = $this->inspector->describeClass($name);
+						}
+						
+						if ($ctx == 'function') {
+							$node = $this->inspector->describeFunction($name);
+						}
+
+						$this->dbgp->sendData(DBGpPacket::action('describe', array($node, $return)));
+						break;
+
+					case 'source':
+						list($src, $line) = explode(' ', $msg[1]);
+						if (file_exists($src)) {
+							$text = file_get_contents($src);
+						} else {
+							$text = false;
+						}
+						$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => $text, 'line' => $line)));
 						break;
 				}
 			}
@@ -507,31 +396,25 @@ class PHPDebugger {
 
 		$this->dbg->sendData(array('alert ' . base64_encode('Timed out')));
 	
-		die("Debugger timed out");		
+		die("Debugger timed out");				
 	}
 
-	public function sendGet($type) {
+	public function send($type) {
 		switch ($type) {
+			case 'local':
+				$this->_sendVars('updateLocal', $this->local, '$');
+				break;
 
 			case 'watch':
-				if ($this->dirty['watch']) {
-					$this->_sendVars('updateWatch', $this->watch);
-					$this->dirty['watch'] = false;
-				}
+				$this->_sendVars('updateWatch', $this->watch);
 				break;
 
 			case 'global':
-				if ($this->dirty['global']) {
-					$this->_sendVars('updateGlobal', $GLOBALS, '$');
-					$this->dirty['global'] = false;
-				}
+				$this->_sendVars('updateGlobal', $GLOBALS, '$');
 				break;
 
 			case 'defines':
-				if ($this->dirty['defined']) {
-					$this->_sendVars('updateDefined', $this->defines, '', false);
-					$this->dirty['defined'] = false;
-				}
+				$this->_sendVars('updateDefined', $this->defines, '', false);
 				break;
 		}
 	}
@@ -541,8 +424,7 @@ class PHPDebugger {
 	 */
 	public function addWatch($name, $val) {
 		$this->watch[$name] = $val;
-		$this->dirty['local'] = true;
-		$this->dirty['watch'] = true;
+		$this->dirty = true;
 	}
 
 	public function diff($vars, $exclude) {
@@ -556,148 +438,6 @@ class PHPDebugger {
 	}
 	
 	
-	protected function is_hash($array) {
-		foreach ($array as $key => $value) {
-			if (!is_int($key)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/**
-	 *
-	 */
-	protected function buildTree(&$data, $name = '', $path = array()) {
-		
-		$def = new PHPDebuggerNode($name, gettype($data));		
-		if ($def->type == 'array' && $this->is_hash($data)) {
-			$def->type = 'hash';
-		}
-
-		$is_global = false;
-		//$is_global = $data === $GLOBALS;
-		if ($name === 'GLOBALS' || $name == '$GLOBALS') {
-			$is_global = true;
-		}
-
-		//recursion detected
-		if ($is_global && in_array('$GLOBALS$', $path)) {
-			$def->type = "string";
-			$def->value = "* RECURSION @ " . array_search('$GLOBALS$', $path, true) . " *";
-			return $def;
-		}
-
-		if (in_array($data, $path, true)) {
-			$def->type = "string";
-			$def->value = "* RECURSION @ " . array_search($data, $path, true) . " *";
-			return $def;
-		}
-
-		if ($is_global) {
-			$path[] = '$GLOBALS$';	
-		} else {
-			$path[] = &$data;
-		}
-
-		switch ($def->type) {
-
-			case 'NULL':
-			case 'boolean':
-			case 'integer':
-			case 'double':
-				$def->value = $data;
-				break;
-
-			case 'string':
-				if (strlen($data) <= 512) {
-					$def->value = $data;
-				} else {
-					$def->value = substr($data, 0, 512) . '&hellip; (' . (strlen($data) - 512) . ' more)';
-				}
-				break;
-
-			case 'unknown type':
-			case 'resource':
-				$def->value = str_replace('Resource id ', '', (string)$data);
-				$def->res_type = get_resource_type($data);
-				break;
-
-			case 'hash':
-				$def->children = array();
-				foreach ($data as $k => $v) {
-					$def->children[] = $this->buildTree($v, $k, $path);
-				}
-				break;
-
-			case 'array':
-				if (count($path) > 1) {
-					$def->pagelimit = $this->config['pagelimit'];
-					
-				} else {
-					$def->pagelimit = count($data);
-				}
-			
-				$def->pagestart = 0;
-				$def->total = count($data);
-
-				$def->children = array();
-				$i = 0;
-
-				foreach ($data as $k => $v) {
-
-					if ($i++ > $def->pagelimit) {
-						break;
-					}
-
-					$def->children[] = $this->buildTree($v, $k, $path);
-				}
-
-				break;
-
-			case 'object':
-				$def->classname = get_class($data);
-
-				$found = array();
-
-				$ref = new ReflectionClass($data);
-				$props = $ref->getProperties();
-				foreach ($props as $prop) {
-					
-					$k = $prop->getName();
-
-					if ($prop->isPrivate() || $prop->isProtected()) {
-
-						$prop->setAccessible(true);
-
-						$v = $prop->getValue($data);
-						$node = $this->buildTree($v, $k, $path);
-						$node->access = $prop->isProtected() ? 'protected' : 'private';
-
-						$prop->setAccessible(false);
-
-					} elseif ($prop->isPublic()) {
-						$found[] = $k;
-						$node = $this->buildTree($data->$k, $k, $path);
-					}
-
-					$def->children[] = $node;
-				}
-
-				//gather non-class variables
-				foreach (get_object_vars($data) as $k => $v) {
-					if (!in_array($k, $found, true)) {
-						$node = $this->buildTree($v, $k, $path);
-						$def->children[] = $node;
-					}
-				}
-
-				break;
-		}
-
-		return $def;
-	}
-	
 }
 
 eval('
@@ -709,7 +449,7 @@ function ' . PHPDebugger::getInstance()->getConfig('shortcut') . '() {
 define('BREAKPOINT', '
 	do {
 		$__debug = PHPDebugger::getInstance();
-		$__eval = $__debug->pauseScript(isset($this) ? $this : NULL,
+		$__eval = $__debug->breakpoint(isset($this) ? $this : NULL,
 			$__debug->diff(get_defined_vars(), array("__debug", "__eval", "__stmt", "__e")),
 			debug_backtrace(),
 			!isset($__eval));

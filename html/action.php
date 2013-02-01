@@ -1,6 +1,6 @@
 <?php
 
-include 'dbgp.php';
+include 'include/dbgp.php';
 
 $action = $_REQUEST['action'];
 $data = $_REQUEST['data'];

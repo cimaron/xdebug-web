@@ -22,7 +22,7 @@ class IOWriter {
 	
 	public function __construct($context = '') {
 		$this->context = $context;
-		$this->path = dirname(__FILE__) . '/ipc/' . $context . '.txt';
+		$this->path = dirname(__FILE__) . '/../ipc/' . $context . '.txt';
 		if (file_exists($this->path)) {
 			$this->fh = fopen($this->path, "r+");
 		}
