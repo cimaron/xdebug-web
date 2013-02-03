@@ -1,13 +1,12 @@
 
-<div class="navbar">
-	<div class="navbar-inner">
-		<div class="btn-group">
-			<a class="btn" href="#" onClick="Debugger.clear_console();">clear</a>
-		</div>
-	</div>
-</div>
+<div id="console-pane">
 
-<div id="console-container">
+	<div id="toolbar" class="ui-widget-header ui-corner-all">
+		<button id="beginning" onClick="Debugger.clear_console();"><img src="/assets/img/icons/cross-script.png" alt="clear" /></button>
+	</div>
+	
+	<div id="console-container">
+	</div>
 </div>
 
 <script type="text/javascript">
@@ -24,7 +23,10 @@
 		$('#tab_console').text('Console');
 	}
 
-	$().ready(resize);
+	$().ready(function() {
+		resize();
+		$('#console-pane .button').button();
+	});
 	$(window).resize(resize);	
     $('#tab_console').on('shown', resize)
 

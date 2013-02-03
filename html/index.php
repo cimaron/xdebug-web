@@ -12,46 +12,87 @@ include dirname(__FILE__) . '/include/config.php';
 	<meta name="author" content="">
 
 	<script src="assets/js/jquery-1.8.2-uncompressed.js"></script>
-	<script src="assets/js/bootstrap.js"></script>
+	<script src="assets/js/jquery-ui-1.10.0.custom.js"></script>
+	<script src="assets/js/jquery.layout.js"></script>
+	<script>
+		$(document).ready(function () {
+			WindowLayout = $('body').layout({
+				north : {
+					size: 40,
+					slidable : false,
+					fxName : "none",
+					spacing_open : 1,
+					resizable : false,
+					togglerLength_open : 0,
+					togglerLength_closed : -1
+				},
+				east : {
+					size : '40%'
+				},
+				center : {
+					paneSelector : ".outer-center",
+					childOptions : {
+						center : {
+							paneSelector : ".middle-center"
+						},
+						south : {
+							paneSelector : ".middle-south",
+							childOptions : {
+								center : {
+									paneSelector : ".inner-center"
+								},
+								east : {
+									paneSelector : ".inner-east",
+									initClosed : true
+								}
+							},
+							size : 200
+						}
+					}
+				}
+			});
+		});
+	</script>
+
 	<script src="assets/js/debugger.js"></script>
 	
 	<!-- Le styles -->
-	<link href="assets/css/bootstrap-uncompressed.css" rel="stylesheet">
+	<link href="assets/css/jquery-ui-1.10.0.custom.css" rel="stylesheet">
+	<link href="assets/css/layout-default.css" rel="stylesheet">
 	<link href="assets/css/debugger.css" rel="stylesheet">
-
-	<!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
-	<!--[if lt IE 9]>
-	<script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
-	<![endif]-->	
 </head>
 
 <body>
 
-<div class="container-fluid">
-
-	<h4 style="position: absolute; right: 20px;">
+<div class="ui-layout-north">
+	<h4 style="margin: 4px;">
 		PHP Debugger <? echo VERSION; ?>
 	</h4>
+</div>
 
-    <ul class="nav nav-tabs">
-		<li class="active">
-			<a id="tab_iframe" href="#iframe" data-toggle="tab">Window</a>
-		</li>
-		<li>
-			<a id="tab_debug" href="#debug" data-toggle="tab">Debug</a>
-		</li>
-		<li>
-			<a id="tab_console" href="#console" data-toggle="tab">Console</a>
-		</li>		
-    </ul>
+<div class="outer-center">
 
-	<div class="tab-content">
-		<div class="tab-pane active" id="iframe"><? include 'tabs/iframe.php'; ?></div>
-		<div class="tab-pane" id="debug"><? include 'tabs/debug.php'; ?></div>
-		<div class="tab-pane" id="console"><? include 'tabs/console.php'; ?></div>
+	<div class="middle-center">
+		<? include 'panes/source.php'; ?>
+	</div>
+
+	<div class="middle-south">
+		<div class="inner-center">
+			<div id="console">
+				<? include 'panes/console.php'; ?>
+			</div>
+		</div>
+		<div class="inner-east" id="debug">
+			<table></table>
+		</div>
 	</div>
 
 </div>
+
+<div class="ui-layout-east" style="width:400px;">
+	<? include 'panes/debug.php'; ?>
+</div>
+
 
 </body>
 </html>

@@ -34,13 +34,13 @@ class PHPDebuggerInspector {
 
 		//recursion detected
 		if ($is_global && in_array('$GLOBALS$', $path)) {
-			$def->type = "string";
+			$def->type = "";
 			$def->value = "* RECURSION @ " . array_search('$GLOBALS$', $path, true) . " *";
 			return $def;
 		}
 
 		if (in_array($data, $path, true)) {
-			$def->type = "string";
+			$def->type = "";
 			$def->value = "* RECURSION @ " . array_search($data, $path, true) . " *";
 			return $def;
 		}

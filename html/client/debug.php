@@ -56,9 +56,12 @@ class PHPDebugger {
 		$this->dbgp = new DBGp(DBGp::CTX_DEBUGGER);
 		$this->inspector = new PHPDebuggerInspector();
 
+		//throw away all stale commands
+		$this->dbgp->getCommands();
+
 		$this->dbgp->sendData(DBGpPacket::init());
 
-		//set_error_handler(array(get_class($this), 'error'), E_ALL & ~E_NOTICE);
+		set_error_handler(array($this, 'error'), E_ALL & ~E_NOTICE);
 	}
 
 	/**
@@ -76,7 +79,8 @@ class PHPDebugger {
 		return $this->config[$key];
 	}
 
-	public static function error($errno, $errstr, $errfile, $errline, $errcontext) {
+	public function error($errno, $errstr, $errfile, $errline, $errcontext) {
+
 		static $errcount = 0, $constants = array();
 
 		//generate list of error types
@@ -91,13 +95,25 @@ class PHPDebugger {
 		//impose some limits for runaway processes
 		if ($errcount++ < 100) {
 			$err = new stdClass;
-	
+
 			isset($constants[$errno]) ? $err->errno = $constants[$errno] : NULL;
 			$errstr ? $err->errstr = $errstr : NULL;
 			$errfile ? $err->errfile = $errfile : NULL;
 			$errline ? $err->errline = $errline : NULL;
 			//$errcontext ? $err->errcontext = $errcontext : NULL;
-			self::getInstance()->log($err);
+
+			$log = new PHPDebuggerNode($err->errno, 'file');
+
+			$file = array(
+				'file' => $err->errfile,
+				'line' => $err->errline,
+				'name' => basename($err->errfile),
+			);
+			$log->value = $file;
+
+			$log->children[] = new PHPDebuggerNode('message', 'string', $err->errstr);
+
+			$this->dbgp->sendData(DBGpPacket::action('log', $log));
 		}
 	}
 
@@ -242,7 +258,7 @@ class PHPDebugger {
 
 		$stack = array();
 
-		$node = new PHPDebuggerNode('', 'array');
+		$node = new PHPDebuggerNode('', 'hash');
 
 		foreach ($trace as $i => $tr) {
 
@@ -309,11 +325,11 @@ class PHPDebugger {
 			$this->send('local');
 
 			//prepare stack
-			$stack = $this->getStack($trace);
-			$this->dbgp->sendData(DBGpPacket::action('updateTrace', $stack));
+			$this->stack = $this->getStack($trace);
 
-			$src = $trace[0]->source;
-			$line = $trace[0]->line;
+			$src = $trace[0]['file'];
+			$line = $trace[0]['line'];
+
 			if (file_exists($src)) {
 				$text = file_get_contents($src);
 			} else {
@@ -321,8 +337,6 @@ class PHPDebugger {
 			}
 
 			$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => $text, 'line' => $line)));
-
-			$this->dbgp->sendData(DBGpPacket::action('selectPane', 'debug'));
 		}
 
 		return $this->pause();
@@ -344,7 +358,6 @@ class PHPDebugger {
 				if ($msg[1]) {
 					$msg[1] = base64_decode($msg[1]);
 				}
-
 				switch ($msg[0]) {
 
 					case 'halt':
@@ -391,7 +404,7 @@ class PHPDebugger {
 				}
 			}
 
-			sleep(1);
+			usleep(100);
 		}
 
 		$this->dbg->sendData(array('alert ' . base64_encode('Timed out')));
@@ -416,6 +429,10 @@ class PHPDebugger {
 			case 'defines':
 				$this->_sendVars('updateDefined', $this->defines, '', false);
 				break;
+
+			case 'stack':
+				$this->_sendVars('updateStack', $this->stack, '', false);
+				break;
 		}
 	}
 
@@ -425,6 +442,7 @@ class PHPDebugger {
 	public function addWatch($name, $val) {
 		$this->watch[$name] = $val;
 		$this->dirty = true;
+		$this->send('watch');
 	}
 
 	public function diff($vars, $exclude) {

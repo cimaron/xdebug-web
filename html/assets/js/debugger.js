@@ -14,11 +14,16 @@ Debugger = {
 
 	connected : {},
 
+	log : function(msg, data) {
+		$('#debug table').append('<tr><td class="key">' + msg + '</td><td class="value">' + this.makeString(data) + '</td></tr>');
+		$('#debug').scrollTop(1000);
+	},
+
 	/**
 	 * Send action to client
 	 */
 	action : function(action, data) {
-		console.log('sent', action, data);
+		this.log('send', action + ':' + data);
 		$.ajax({
 			url : "action.php",
 			type : 'post',
@@ -68,14 +73,16 @@ Debugger = {
 	update : function(data) {
 		for (var i = 0; i < data.length; i++) {
 			var msg = data[i];
-			console.log('got', msg);
 			if (msg.init) {
+				this.log('init', '');
 				this.handleInit(msg.init);	
 			} else if (msg.close) {
+				this.log('closed', '');
 				this.handleClose(msg);	
 			}
 
 			if (typeof this['action_' + msg.action] == 'function') {
+				this.log('received', msg.action);
 				this['action_' + msg.action](msg.data);	
 			}
 		}
@@ -104,39 +111,35 @@ Debugger = {
 	 * Update local variables action
 	 */
 	action_updateLocal : function(data) {
-		this.updateWatch('local', data);
+		this.updateWatch('inspect-local', data);
 	},
 
 	/**
 	 * Update watch variables action
 	 */
 	action_updateWatch : function(data) {
-		this.updateWatch('watch-container', data);
+		this.updateWatch('inspect-watch', data);
 	},
 
 	/**
 	 * Update global variables action
 	 */
 	action_updateGlobal : function(data) {
-		this.updateWatch('global', data);
+		this.updateWatch('inspect-global', data);
 	},
 
 	/**
 	 * Update defined variables action
 	 */
 	action_updateDefined : function(data) {
-		this.updateWatch('defines', data);
+		this.updateWatch('inspect-defines', data);
 	},
 
 	/**
-	 * Update trace variables action
+	 * Update stack frames
 	 */
-	action_updateTrace : function(data) {
-		this.updateWatch('trace', data);
-	},
-
-	action_selectPane : function(pane) {
-		$('#tab_' + pane).tab('show');
+	action_updateStack : function(data) {
+		this.updateWatch('inspect-stack', data);
 	},
 
 	/**
@@ -161,19 +164,6 @@ Debugger = {
 		watch.children = [data];
 
 		this.updateWatch('console-' + uid, watch);
-
-		if (!$($('#tab_console')[0].parentNode).hasClass('active')) {
-			var count = 0;
-			var text = $('#tab_console').text();
-			var res;
-			if (res = text.match(/Console \(([0-9]+)\)/)) {
-				count = parseInt(res[1]);
-			}
-			count++;
-			$('#tab_console').text('Console (' + count + ')');
-		}
-
-		
 	},
 	
 	action_describe : function(data) {
@@ -183,7 +173,6 @@ Debugger = {
 	},
 	
 	updateWatch : function(id, data, append) {
-
 		var table = $('<table width="100%" />');
 		if (append) {
 			$('#' + id).append(table);
@@ -222,13 +211,13 @@ Debugger = {
 
 		el = $(button).closest('tr.watch_row')[0];
 
-		state = $(button).html() == '+';
+		state = !$(button).hasClass('watch-toggle-open');
 
 		if (state) {
-			$(button).html('-');
+			$(button).addClass('watch-toggle-open');
 			$(el).removeClass('inactive').addClass('active');
 		} else {
-			$(button).html('+');
+			$(button).removeClass('watch-toggle-open');
 			$(el).removeClass('active').addClass('inactive');			
 		}
 
@@ -276,16 +265,17 @@ Debugger = {
 		} else {
 			out += '<tr class="watch_row watch_row_' + uid + ' watch_row_' + parentid + '_child inactive" id="watch_row_' + uid + '" style="display:none">';
 		}
-		
+
 		out += '<td style="padding-left:' + indent + 'px;"><span>';
 		if (tree.children.length) {
-			out += '<span class="watch-toggle" onclick="Debugger.toggleWatch(this);">+</span>';
+			out += '<span class="watch-toggle" onclick="Debugger.toggleWatch(this);"></span>';
 		}
+
 		out += '<span><span class="watch-name">' + tree.name + '</span></span></td>';
 		out += '<td>' + tree.display + '</td>';
 		
 		if (depth == 0) {
-			out += '<td class="watch-close"><span>&times;</span></td>';	
+			//out += '<td class="watch-close"><span>&times;</span></td>';	
 		}
 		
 		out += '</tr>';
@@ -307,8 +297,8 @@ Debugger = {
 
 		//value display
 		node.display = data;
-		node.short = data;
-		node.name = data.name;
+		node.short = data.value;
+		node.name = this.makeString(data.name);
 
 		//
 		node.children = [];
@@ -363,7 +353,7 @@ Debugger = {
 				var full = '<span class="watch-string">' + value + '</span>';
 				var short_str;
 
-				if (value.length > 63) {
+				if (value.length > 80) {
 					node.children = [{name : "", display : full, children : []}];
 					short_str = value.substr(0, 30) + ' &hellip; ' + value.substr(value.length - 30);
 					short_str = short_str.replace(/\s/, '&nbsp;');
@@ -456,7 +446,7 @@ Debugger = {
 				node.name = '<span class="watch-key-function">' + node.name + '</span>';
 				if (!node.children.length) {
 					node.display = '<span class="watch-function describe" rel="function ' + data.name + '">function()</span>';
-					node.children = [{name : "loading...", display : "", children : []}];
+					node.children = [{name : '<div class="loading"></div>', display : "", children : []}];
 				} else {
 					node.display = '<span class="watch-function">function()</span>';					
 				}
@@ -467,7 +457,7 @@ Debugger = {
 				node.name = '<span class="watch-key-class">' + node.name + '</span>';
 				if (!node.children.length) {
 					node.display = '<span class="watch-class describe" rel="class ' + data.name + '">Class</span>';
-					node.children = [{name : "loading...", display : "", children : []}];
+					node.children = [{name : '<div class="loading"></div>', display : "", children : []}];
 				} else {
 					node.display = '<span class="watch-class">Class</span>';
 				}

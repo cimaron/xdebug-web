@@ -1,9 +1,45 @@
+table {
+	border-spacing: 0;
+	border-collapse: collapse;
+}
 
-.container-fluid {
+td {
+	border: inherit;
+}
+
+.ui-layout-pane {
+	padding:	0;
+	overflow:	hidden;
+}
+.ui-layout-pane .ui-tabs-nav {
+	/* don't need border or rounded corners - tabs 'fill' the pane */
+	border-top:		0;
+	border-left:	0;
+	border-right:	0;
+	padding-bottom:	0 !important;
+	border-radius: 0;
+	-moz-border-radius:		0;
+	-webkit-border-radius:	0;
+}
+
+.ui-widget {
+	font-family: inherit;
+	font-size: 12px;
+}
+
+.ui-widget-content {
+	border: none;
+}
+
+.ui-tabs {
+	padding: 0;
+}
+.ui-tabs .ui-tabs-panel {
 	padding: 0;
 }
 
-#src_container {
+
+#source-container {
 	position: relative;
 	font-family: "Courier New", Courier, monospace;
 	font-size: 12px;
@@ -22,6 +58,53 @@
     left: 0;
 }
 
+#buttons-container {
+	padding: 4px;
+	margin-right: 0;
+	border: none;
+	overflow: hidden;
+	background-color: #CCCCCC;
+}
+
+#buttons {
+	float: right;
+}
+
+button {
+	border-radius: 2px;
+	border: solid 1px #999999;
+	width: 24px;
+	height: 24px;
+	padding: 2px;
+	background-color: #EEEEEE;
+}
+
+button:hover {
+	background-color: #999999;
+}
+
+button[disabled] {
+	opacity: .5;
+}
+
+button[disabled]:hover {
+	background-color: #EEEEEE;
+}
+
+#source-pane,
+#inspect-pane {
+	height: 100%;
+}
+
+#inspect-pane ul a img {
+	float: left;
+	margin-right: 4px;
+}
+
+#inspect-panes {
+	overflow: auto;
+}
+
 #addwatch {
 	width: 100%;
 }
@@ -37,6 +120,40 @@
 
 #console-container > div.watch {
 	border-bottom-width: 0;
+}
+
+#debug {
+	font-family: "Courier New", Courier, monospace;
+	font-size: 11px;
+	overflow: auto;
+}
+
+#debug table {
+	width: 100%;
+}
+
+#debug tr {
+	border-bottom: solid 1px #CCCCCC;
+}
+
+#debug .key {
+	background-color: #333333;
+	color: #FFFFFF;
+	font-weight: bold;
+	width: 0;
+	padding-right: 10px;
+}
+
+#debug .value {
+	padding-left: 10px;
+	color: #000066;
+}
+
+.loading {
+	height: 40px;
+	background-image: url(../img/spinner.gif);
+	background-repeat: no-repeat;
+	background-position: center center;
 }
 
 .watch {
@@ -71,31 +188,18 @@
 }
 
 .watch-toggle {
-	float: left;
 	position: absolute;
-	
 	left: 0;
-	top: 1px;
-	
-	border: solid 1px #999999;
-	border-radius: 2px;
-
+	top: 3px;
 	height: 9px;
 	width: 9px;
-
-	font-family: "Courier New", Courier, monospace;
-	font-size: 13px;
-	line-height: 9px;
-	text-align: center;
-	color: #000000;
 	cursor: pointer;
+	background-image: url(../img/icons/plus-small-white.png);
+	background-position: -3px -3px;
+}
 
-	background: #fcfff4;
-	background: -moz-linear-gradient(top, #fcfff4 0%, #dfe5d7 40%, #b3bead 100%);
-	background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#fcfff4), color-stop(40%,#dfe5d7), color-stop(100%,#b3bead));
-	background: -webkit-linear-gradient(top, #fcfff4 0%,#dfe5d7 40%,#b3bead 100%);
-	background: -ms-linear-gradient(top, #fcfff4 0%,#dfe5d7 40%,#b3bead 100%);
-	background: linear-gradient(to bottom, #fcfff4 0%,#dfe5d7 40%,#b3bead 100%);
+.watch-toggle-open {
+	background-image: url(../img/icons/minus-small-white.png);
 }
 
 .watch-name {
