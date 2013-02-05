@@ -56,7 +56,7 @@
 			activate : function(e, tabs) {
 				var watch = tabs.newTab.attr('rel');
 				$('#inspect-' + watch).html('<div class="loading"></div>');
-				Debugger.action('get', watch);
+				Debugger.command('get', watch);
 			}
 		});
 
@@ -71,7 +71,7 @@
 	Debugger.addWatch = function(el) {
 		var val = $(el).val();
 		$(el).val('');
-		Debugger.action('exec', val);
+		Debugger.command('exec', val);
 	}
 
 }(jQuery));

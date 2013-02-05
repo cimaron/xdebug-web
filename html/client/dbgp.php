@@ -31,7 +31,7 @@ class DBGpPacket {
 		return self::encode($packet);
 	}
 
-	public static function action($name, $data) {
+	public static function response($name, $data) {
 		return self::encode(array('action' => $name, 'data' => $data));
 	}
 

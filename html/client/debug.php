@@ -19,7 +19,7 @@ class PHPDebugger {
 	protected $stack = array();
 	protected $local = array();
 	protected $globals = array();
-	
+
 	protected $dirty = true;
 
 	protected $config = array(
@@ -113,7 +113,7 @@ class PHPDebugger {
 
 			$log->children[] = new PHPDebuggerNode('message', 'string', $err->errstr);
 
-			$this->dbgp->sendData(DBGpPacket::action('log', $log));
+			$this->dbgp->sendData(DBGpPacket::response('log', $log));
 		}
 	}
 
@@ -123,7 +123,7 @@ class PHPDebugger {
 	public function log() {
 		foreach (func_get_args() as $data) {
 			$inspect = $this->inspector->inspect($data);
-			$this->dbgp->sendData(DBGpPacket::action('log', $inspect));
+			$this->dbgp->sendData(DBGpPacket::response('log', $inspect));
 		}
 	}
 
@@ -154,7 +154,7 @@ class PHPDebugger {
 			$tree = $vars;
 		}
 
-		$this->dbgp->sendData(DBGpPacket::action($action, $tree));
+		$this->dbgp->sendData(DBGpPacket::response($action, $tree));
 	}
 
 	/**
@@ -336,11 +336,38 @@ class PHPDebugger {
 				$text = "Could not load $src";
 			}
 			
-			$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
+			$this->dbgp->sendData(DBGpPacket::response('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
 		//	exit;
 		}
 
 		return $this->pause();
+	}
+
+	/**
+	 * Parse a command
+	 *
+	 * @param   string   $command   Command to parse
+	 *
+	 * @return  object
+	 */
+	protected function parseCommand($command) {
+		$parts = preg_split('#\s#', trim($command));
+
+		$parsed = new stdClass;
+		$parsed->command = $parts[0];
+		$parsed->data = array();
+
+		for ($i = 1; $i < count($parts); $i++) {
+			if ($parts[$i][0] == '-') {
+				$key = substr($parts[$i], 1);
+				$parsed->$key = $parts[$i + 1];
+				$i++;
+			} else {
+				$parsed->data[] = base64_decode($parts[$i]);
+			}
+		}
+
+		return $parsed;
 	}
 
 	/**
@@ -355,11 +382,10 @@ class PHPDebugger {
 			$queue = $this->dbgp->getCommands();
 
 			foreach ($queue as $msg) {
-				$msg = explode(' ', $msg);
-				if ($msg[1]) {
-					$msg[1] = base64_decode($msg[1]);
-				}
-				switch ($msg[0]) {
+
+				$command = $this->parseCommand($msg);
+
+				switch ($command->command) {
 
 					case 'halt':
 						die("Terminated by debugger");
@@ -369,18 +395,18 @@ class PHPDebugger {
 						break;
 
 					case 'exec':
-						return array($msg[1]);
+						return array($command->data[0]);
 						break;
 
 					case 'resume':
 						return array();
 
 					case 'get':
-						$this->send($msg[1]);
+						$this->send($command->data[0]);
 						break;
 
 					case 'describe':
-						list($ctx, $name, $return) = explode(' ', $msg[1]);
+						list($ctx, $name, $return) = explode(' ', $command->data[0]);
 
 						if ($ctx == 'class') {
 							$node = $this->inspector->describeClass($name);
@@ -390,18 +416,18 @@ class PHPDebugger {
 							$node = $this->inspector->describeFunction($name);
 						}
 
-						$this->dbgp->sendData(DBGpPacket::action('describe', array($node, $return)));
+						$this->dbgp->sendData(DBGpPacket::response('describe', array($node, $return)));
 						break;
 
 					case 'source':
-						list($src, $line) = explode(' ', $msg[1]);
+						list($src, $line) = explode(' ', $command->data[0]);
 						if (file_exists($src)) {
 							$text = file_get_contents($src);
 						}
 						if ($text === false) {
 							$text = "Could not load $src";
 						}
-						$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
+						$this->dbgp->sendData(DBGpPacket::response('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
 						break;
 				}
 			}
@@ -413,6 +439,7 @@ class PHPDebugger {
 	}
 
 	public function send($type) {
+
 		switch ($type) {
 			case 'local':
 				$this->_sendVars('updateLocal', $this->local, '$');

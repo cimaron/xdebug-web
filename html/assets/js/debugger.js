@@ -7,7 +7,8 @@ Debugger = {
 	version : '0.2',
 	
 	uid : 0,
-	
+	tid : 0,
+
 	options : {
 		srcId : 'src',
 	},
@@ -20,32 +21,33 @@ Debugger = {
 	},
 
 	/**
-	 * Send action to client
+	 * Send command to client
 	 */
-	action : function(action, data) {
-		this.log('send', action + ':' + data);
+	command : function(command, data) {
+		this.log('send', command + ':' + data);
 		$.ajax({
-			url : "action.php",
+			url : "command.php",
 			type : 'post',
 			data : {
-				action : action,
-				data : data
+				command : command,
+				data : data,
+				tid : this.tid++
 			}
 		});
 	},
 
 	/**
-	 * Send resume action to client
+	 * Send resume command to client
 	 */
 	resume : function() {
-		this.action('resume');
+		this.command('resume');
 	},
 
 	/**
-	 * Send halt action to client
+	 * Send halt command to client
 	 */
 	halt : function() {
-		this.action('halt');
+		this.command('halt');
 	},
 
 	/**
@@ -74,7 +76,6 @@ Debugger = {
 		for (var i = 0; i < data.length; i++) {
 			var msg = data[i];
 			if (msg.init) {
-				this.log('init', '');
 				this.handleInit(msg.init);	
 			} else if (msg.close) {
 				this.log('closed', '');
@@ -96,6 +97,8 @@ Debugger = {
 	handleInit : function(init) {
 		this.connected[init.thread] = init;
 		init.features = [];
+		init.requests = [];
+		this.log('init', init.thread);
 	},
 
 	/**
@@ -224,7 +227,7 @@ Debugger = {
 		reload = $(el).find('.describe')[0];
 		if (reload) {
 			var ctx = $(reload).attr('rel');
-			this.action('describe', ctx + ' ' + el.id);
+			this.command('describe', ctx + ' ' + el.id);
 		}
 
 		this.toggleChildren(el, state);
@@ -375,7 +378,7 @@ Debugger = {
 			case 'file':
 				var full = '<span class="watch-file">' + data.value.file + ' (line ' + data.value.line + ')</span>';
 
-				var onclick = "Debugger.action('source', '" + data.value.file.replace(/("')/, '\\$1') + " " + data.value.line + "')";
+				var onclick = "Debugger.command('source', '" + data.value.file.replace(/("')/, '\\$1') + " " + data.value.line + "')";
 				node.display = '<span class="watch-file" onclick="' + onclick + '">' + data.value.name + ' (line ' + data.value.line + ')</span>';
 				node.short = node.display;
 				node.children.unshift({name : "", display : full, children : []});

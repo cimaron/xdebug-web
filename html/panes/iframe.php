@@ -21,26 +21,12 @@
 		$('#windowPane').height(newheight);	
 	}
 
-	$().ready(resize);
 	$(window).resize(resize);
+
 	$('#tab_iframe').on('shown', resize)
 
-	Debugger.reloadWindow = function(form) {
-		$('#windowPane').attr('src', $('#windowPane').attr('src'));
-	};
-
-	Debugger.loadWindow = function(form) {
-		$.ajax({
-			url : "home.php",
-			data : {action:"add",url:form.url.value}
-		});
-		$('#windowPane').attr('src', form.url.value);
-	};
-	
 	$().ready(function() {
-		$('#windowPane').on('load', function() {
-			$('#window-form').find('input[name="url"]').val($('#windowPane')[0].contentWindow.location.href);
-		});
+		resize();
 	});
 }(jQuery));
 </script>
