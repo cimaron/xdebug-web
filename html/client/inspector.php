@@ -2,7 +2,20 @@
 
 class PHPDebuggerInspector {
 
-	
+	protected $config = array(
+		'pagelimit' => 40,
+	);
+
+	/**
+	 * Constructor
+	 *
+	 * @param   array   $config   Configuration overrides	 
+	 */
+	public function __construct($config = array()) {
+		$this->config = array_merge($this->config, $config);
+	}
+
+
 	public function inspect(&$data, $name = '', $path = array()) {
 		return $this->buildTree($data, $name, $path);
 	}

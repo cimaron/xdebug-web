@@ -71,14 +71,24 @@ td {
 }
 
 button {
+	/*
 	border-radius: 2px;
 	border: solid 1px #999999;
+	*/
 	width: 24px;
 	height: 24px;
+	
 	padding: 2px;
+	/*
 	background-color: #EEEEEE;
+	*/
 }
 
+.ui-button-text-only .ui-button-text {
+	padding: 3px;
+}
+
+/*
 button:hover {
 	background-color: #999999;
 }
@@ -90,6 +100,7 @@ button[disabled] {
 button[disabled]:hover {
 	background-color: #EEEEEE;
 }
+*/
 
 #source-pane,
 #inspect-pane {

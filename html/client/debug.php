@@ -27,7 +27,6 @@ class PHPDebugger {
 		'active' => true,
 		'shortcut' => 'DEBUG',
 		'domain' => 'http://debugger.cimaron.vm',
-		'pagelimit' => 40,
 	);
 
 	/**
@@ -54,7 +53,8 @@ class PHPDebugger {
 	
 		$this->config = array_merge($this->config, $config);
 		$this->dbgp = new DBGp(DBGp::CTX_DEBUGGER);
-		$this->inspector = new PHPDebuggerInspector();
+
+		$this->inspector = new PHPDebuggerInspector($config);
 
 		//throw away all stale commands
 		$this->dbgp->getCommands();
@@ -263,30 +263,30 @@ class PHPDebugger {
 		foreach ($trace as $i => $tr) {
 
 			$name = $i;
-			if ($tr['function']) {
+			if (isset($tr['function'])) {
 				$name = $tr['function'] . '()';
 			}
-			if ($tr['class']) {
+
+			if (isset($tr['class'])) {
 				$name = $tr['class'] . $tr['type'] . $name;
 			}
 
-			$frame = new PHPDebuggerNode($name, 'file');
-			$node->children[] = $frame;
-
-			if ($tr['file']) {
-				$file = array(
+			if (isset($tr['file'])) {
+				$frame = new PHPDebuggerNode($name, 'file');
+				$frame->value = array(
 					'file' => $tr['file'],
 					'line' => $tr['line'],
 					'name' => basename($tr['file']),
 				);
-				$frame->value = $file;
+
+				$node->children[] = $frame;
 			}
 
-			if ($tr['object']) {
+			if (isset($tr['object'])) {
 				$frame->children[] = $this->inspector->inspect($tr['object'], '$this');
 			}
 
-			if ($tr['args']) {
+			if (isset($tr['args'])) {
 				foreach ($tr['args'] as $k => $v) {
 					$frame->children[] = $this->inspector->inspect($v, $k);
 				}
@@ -333,10 +333,11 @@ class PHPDebugger {
 			if (file_exists($src)) {
 				$text = file_get_contents($src);
 			} else {
-				$text = false;
+				$text = "Could not load $src";
 			}
-
-			$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => $text, 'line' => $line)));
+			
+			$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
+		//	exit;
 		}
 
 		return $this->pause();
@@ -396,10 +397,11 @@ class PHPDebugger {
 						list($src, $line) = explode(' ', $msg[1]);
 						if (file_exists($src)) {
 							$text = file_get_contents($src);
-						} else {
-							$text = false;
 						}
-						$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => $text, 'line' => $line)));
+						if ($text === false) {
+							$text = "Could not load $src";
+						}
+						$this->dbgp->sendData(DBGpPacket::action('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
 						break;
 				}
 			}
@@ -407,8 +409,6 @@ class PHPDebugger {
 			usleep(100);
 		}
 
-		$this->dbg->sendData(array('alert ' . base64_encode('Timed out')));
-	
 		die("Debugger timed out");				
 	}
 
