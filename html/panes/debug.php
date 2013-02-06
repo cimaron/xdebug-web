@@ -70,6 +70,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		panes.height(newheight);
 	}
 
+	WindowLayout.options.east.onresize = function() {
+		resize();
+		return true;
+	};
+
 	$().ready(function() {
 
 		$('.tabs').tabs({
@@ -80,11 +85,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			}
 		});
 
-		WindowLayout.options.east.onresize = function() {
-			resize();
-			return true;
-		};
-	
 		resize();
 	});
 

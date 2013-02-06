@@ -36,23 +36,26 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 (function($) {
 
 	function resize() {
-		$('#console-container').height(0);
-		var newheight =  $(document).height() - $('#console-container').offset().top;
-		$('#console-container').height(newheight);	
+		var pane = $('#console-pane');
+		pane.height('100%');
+		var con = $('#console-container');
+
+		con.height(0);
+
+		var newheight =  pane.height() - (con.offset().top - pane.offset().top);
+		console.log(pane.height(), con.offset().top, pane.offset().top);
+		con.height(newheight);
 	}
 
-	function shown() {
-		$('#tab_console').text('Console');
-	}
+	WindowLayout.options.center.childOptions.south.childOptions.center.onresize = function() {
+		resize();
+		return true;
+	};
 
 	$().ready(function() {
-		resize();
 		$('#console-pane .button').button();
+		resize();
 	});
-	$(window).resize(resize);	
-    $('#tab_console').on('shown', resize)
-
-    $('#tab_console').on('shown', shown)
 
 	Debugger.clear_console = function() {
 		$('#console-container').html('');

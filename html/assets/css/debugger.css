@@ -103,7 +103,8 @@ button[disabled]:hover {
 */
 
 #source-pane,
-#inspect-pane {
+#inspect-pane,
+#console-pane {
 	height: 100%;
 }
 

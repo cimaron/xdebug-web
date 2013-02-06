@@ -36,42 +36,46 @@ include dirname(__FILE__) . '/include/config.php';
 	<script src="assets/js/jquery-ui-1.10.0.custom.js"></script>
 	<script src="assets/js/jquery.layout.js"></script>
 	<script>
-		$(document).ready(function () {
-			WindowLayout = $('body').layout({
-				north : {
-					size: 40,
-					slidable : false,
-					fxName : "none",
-					spacing_open : 1,
-					resizable : false,
-					togglerLength_open : 0,
-					togglerLength_closed : -1
-				},
-				east : {
-					size : '40%'
-				},
-				center : {
-					paneSelector : ".outer-center",
-					childOptions : {
-						center : {
-							paneSelector : ".middle-center"
-						},
-						south : {
-							paneSelector : ".middle-south",
-							childOptions : {
-								center : {
-									paneSelector : ".inner-center"
-								},
-								east : {
-									paneSelector : ".inner-east",
-									initClosed : true
-								}
+		//Initialize this here so our subpanes can modify the configuration before loading
+		WindowLayout = {};
+		WindowLayout.options = {
+			north : {
+				size: 40,
+				slidable : false,
+				fxName : "none",
+				spacing_open : 1,
+				resizable : false,
+				togglerLength_open : 0,
+				togglerLength_closed : -1
+			},
+			east : {
+				size : '40%'
+			},
+			center : {
+				paneSelector : ".outer-center",
+				childOptions : {
+					center : {
+						paneSelector : ".middle-center"
+					},
+					south : {
+						paneSelector : ".middle-south",
+						childOptions : {
+							center : {
+								paneSelector : ".inner-center",
 							},
-							size : 200
-						}
+							east : {
+								paneSelector : ".inner-east",
+								initClosed : true
+							}
+						},
+						size : 200
 					}
 				}
-			});
+			}
+		};
+
+		$(document).ready(function () {
+			WindowLayout.layout = $('body').layout(WindowLayout.options);
 		});
 	</script>
 
@@ -99,9 +103,7 @@ include dirname(__FILE__) . '/include/config.php';
 
 	<div class="middle-south">
 		<div class="inner-center">
-			<div id="console">
-				<? include 'panes/console.php'; ?>
-			</div>
+			<? include 'panes/console.php'; ?>
 		</div>
 		<div class="inner-east" id="debug">
 			<table></table>

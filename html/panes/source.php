@@ -66,13 +66,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		editor.resize();	
 	}
 
+	WindowLayout.options.center.childOptions.center.onresize = function() {
+		resize();
+		return true;
+	};
+
 	$().ready(function() {
 		$('#buttons').buttonset();
-		WindowLayout.center.children.layout1.options.center.onresize = function() {
-			resize();
-			return true;
-		};
-	
 		resize();
 	});
 	
