@@ -102,10 +102,21 @@ button[disabled]:hover {
 }
 */
 
+#source-file {
+	
+}
+
+
 #source-pane,
 #inspect-pane,
 #console-pane {
 	height: 100%;
+}
+
+#run-state {
+	font-size: 12px;
+	font-family: "Courier New", Courier, monospace;
+	color: #666666;
 }
 
 #inspect-pane ul a img {

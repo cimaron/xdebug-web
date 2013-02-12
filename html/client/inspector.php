@@ -25,6 +25,7 @@ class PHPDebuggerInspector {
 
 	protected $config = array(
 		'pagelimit' => 40,
+		'maxdepth' => 5,
 	);
 
 	/**
@@ -54,6 +55,11 @@ class PHPDebuggerInspector {
 	 *
 	 */
 	protected function buildTree(&$data, $name = '', $path = array()) {
+		
+		if (count($path) >= $this->config['maxdepth']) {
+			$def = new PHPDebuggerNode($name, '', 'max_depth:' . gettype($data));
+			return $def;
+		}
 		
 		$def = new PHPDebuggerNode($name, gettype($data));		
 		if ($def->type == 'array' && $this->is_hash($data)) {

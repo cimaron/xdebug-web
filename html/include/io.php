@@ -26,6 +26,7 @@ class IOWriter {
 	const MAX_TRIES = 100;
 
 	protected $context = '';
+	protected $dir = '';
 	protected $path = '';
 	protected $fh = NULL;
 	protected $locked = false;
@@ -37,16 +38,18 @@ class IOWriter {
 		}
 		return $instances[$context];
 	}
-	
+
 	public function __construct($context = '') {
-		$this->context = $context;
-		$this->path = dirname(__FILE__) . '/../ipc/' . $context . '.txt';
-		if (file_exists($this->path)) {
-			$this->fh = fopen($this->path, "r+");
-		}
+		$this->context = preg_replace('#\.\.+#', '', $context);
+
+		$this->dir = realpath(dirname(__FILE__) . '/../ipc');
+		$this->path = $this->dir . '/' . $this->context . '.txt';
+
+		$this->fh = fopen($this->path, "c+");
+		@chmod($this->path, 0777);
 	}
 
-	public function read() {
+	public function read($empty = true) {
 
 		if (!$this->fh) {
 			return false;
@@ -63,7 +66,9 @@ class IOWriter {
 			$buffer .= $data;
 		}
 
-		ftruncate($this->fh, 0);
+		if ($empty) {
+			ftruncate($this->fh, 0);
+		}
 
 		$this->unlock();
 
@@ -71,7 +76,7 @@ class IOWriter {
 	}
 
 
-	public function write($str) {
+	public function write($str, $queue = true) {
 
 		$locked = $this->locked;
 
@@ -83,7 +88,11 @@ class IOWriter {
 			return false;
 		}
 
-		fseek($this->fh, 0, SEEK_END);
+		if ($queue) {
+			fseek($this->fh, 0, SEEK_END);
+		} else {
+			ftruncate($this->fh, 0);
+		}
 
 		$result = fwrite($this->fh, $str);
 
@@ -130,5 +139,13 @@ class IOWriter {
 		}
 	}
 
+	/**
+	 * Remove file
+	 */
+	public function destroy() {
+		if ($this->path && file_exists($this->path)) {
+			unlink($this->path);
+		}
+	}
 }
 

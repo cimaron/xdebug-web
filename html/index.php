@@ -80,6 +80,7 @@ include dirname(__FILE__) . '/include/config.php';
 	</script>
 
 	<script src="assets/js/debugger.js"></script>
+	<script src="assets/js/inspector.js"></script>
 	
 	<!-- Le styles -->
 	<link href="assets/css/jquery-ui-1.10.0.custom.css" rel="stylesheet">

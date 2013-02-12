@@ -24,28 +24,30 @@ include dirname(__FILE__) . '/io.php';
 
 class DBGp {
 
-	const CTX_DEBUGGER = 0x1;
-	const CTX_IDE = 0x2;
+	const CTX_DEBUGGER = 1;
+	const CTX_IDE      = 2;
 
 	protected $reader = NULL;
 	protected $writer = NULL;
+	protected $control = NULL;
 
 	protected $format_data = NULL;
 	protected $format_cmd = NULL;
 
-
-	public function __construct($context) {
+	public function __construct($context, $connection) {
 
 		$this->format_data = new DBGpDataPacket();
 		$this->format_cmd = new DBGpCmdPacket();
-			
+
 		if ($context == self::CTX_DEBUGGER) {
-			$this->reader = IOWriter::getInstance('in');
-			$this->writer = IOWriter::getInstance('out');			
+			$this->reader = IOWriter::getInstance($connection . '.in');
+			$this->writer = IOWriter::getInstance($connection . '.out');			
 		} elseif ($context == self::CTX_IDE) {
-			$this->reader = IOWriter::getInstance('out');
-			$this->writer = IOWriter::getInstance('in');			
+			$this->reader = IOWriter::getInstance($connection . '.out');
+			$this->writer = IOWriter::getInstance($connection . '.in');			
 		}
+
+		$this->control = IOWriter::getInstance('status');
 	}
 
 	public function sendCommand($command) {
@@ -96,7 +98,7 @@ class DBGpDataPacket {
 
 			if ($n2 - $n1 - 1 == $len) {
 				$packet = substr($data, $n1 + 1, $len);
-				$prepared[] = base64_decode($packet);
+				$prepared[] = $packet;
 			}
 
 			$data = substr($data, $n2 + 1);
@@ -114,7 +116,6 @@ class DBGpDataPacket {
 		$null = chr(0);
 		$processed = '';
 		foreach ($data as $packet) {
-			$packet = base64_encode($packet);
 			$processed .= (string)strlen($packet);
 			$processed .= $null;
 			$processed .= $packet;
@@ -134,7 +135,7 @@ class DBGpCmdPacket {
 	public function process($data) {
 		$prepared = array();
 
-		foreach (explode("\n", $data) as $res) {
+		foreach (explode(chr(0), $data) as $res) {
 			if ($res) {
 				$prepared[] = $res;
 			}
@@ -152,7 +153,7 @@ class DBGpCmdPacket {
 
 		//foreach unecessary, except to leave space for extra processing per-item if needed
 		foreach ($data as $cmd) {
-			$processed .= $cmd . "\n";
+			$processed .= $cmd . chr(0);
 		}
 
 		return $processed;

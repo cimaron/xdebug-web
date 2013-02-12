@@ -1,92 +1,266 @@
+/*
+Copyright (c) 2013 Cimaron Shanahan
 
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 (function($) {
 
+$.entityEncode = function(str) {
+	return $('<div />').text(str || "").html();
+};
+
+
+
+var tid = 1;
+var Transaction = function(args, func, options) {
+	this.id = tid++;
+	this.args = args;
+	this.args.tid = this.id;
+	this.func = func;
+	this.options = options;
+};
+Transaction.prototype.exec = function(context, res) {
+
+	if (!this.func) {
+		return null;
+	}
+
+	return this.func.call(context, res, this);
+};
+
+
+/**
+ * Debugger Object
+ */
 Debugger = {
-	
+
 	version : '0.2',
 	
-	uid : 0,
-	tid : 0,
-
 	options : {
-		srcId : 'src',
+		elements : {
+			state : 'run-state',
+			source : 'source-container',
+			file : 'source-file',
+			context : 'inspect-local',
+			stack : 'inspect-stack'
+		}		
 	},
 
-	connected : {},
+	state : null,
+	globalState : {
+		filePrefix : '/var/www/www.tor.vm/files/code/cb.1_8/html/',
+		breakpoints : {}
+	},
 
-	log : function(msg, data) {
-		$('#debug table').append('<tr><td class="key">' + msg + '</td><td class="value">' + this.makeString(data) + '</td></tr>');
+	/**
+	 * Write log info
+	 *
+	 * @param   string   action   Action or command
+	 * @param   string   data     Extra data
+	 */
+	log : function(action, data) {
+		console.log(action + ": ", data);
+		$('#debug table').append('<tr><td class="key">' + action + '</td><td class="value">' + $.entityEncode(data) + '</td></tr>');
 		$('#debug').scrollTop(1000);
 	},
 
 	/**
-	 * Send command to client
-	 */
-	command : function(command, data) {
-		this.log('send', command + ':' + data);
-		$.ajax({
-			url : "command.php",
-			type : 'post',
-			data : {
-				command : command,
-				data : data,
-				tid : this.tid++
-			}
-		});
-	},
-
-	/**
-	 * Send resume command to client
-	 */
-	resume : function() {
-		this.command('resume');
-	},
-
-	/**
-	 * Send halt command to client
-	 */
-	halt : function() {
-		this.command('halt');
-	},
-
-	/**
-	 * Polling function for status updates
+	 * Polling function to check status
 	 *
 	 * @static
 	 */
-	updater : function() {
+	checker : function() {
 		$.ajax({
-			url : "update.php",
+			url : "status.php",
 			dataType : 'json',
 			complete : function(xhr, status) {
-				setTimeout(Debugger.updater, 0);
+				//setTimeout(function() { Debugger.checker(); }, 5000);
 			},
 			success : function(data, xhr) {
-				Debugger.update(data);
+				Debugger.handleResponse(data);
+				Debugger.listener();
 			}
-
 		});
 	},
 
 	/**
-	 * Process status updates
+	 * Polling function to listen for data
+	 *
+	 * @static
 	 */
-	update : function(data) {
-		for (var i = 0; i < data.length; i++) {
-			var msg = data[i];
-			if (msg.init) {
-				this.handleInit(msg.init);	
-			} else if (msg.close) {
-				this.log('closed', '');
-				this.handleClose(msg);	
+	listener : function() {
+		$.ajax({
+			url : "listen.php",
+			dataType : 'json',
+			complete : function(xhr, status) {
+				setTimeout(function() { Debugger.listener(); }, 0);
+			},
+			success : function(data, xhr) {
+				Debugger.handleResponse(data);
+			}
+		});
+	},
+
+	/**
+	 * Send command to client
+	 *
+	 * @param   string   command    Command to execute
+	 * @param   hash     args       Optional arguments
+	 * @param   string   data       Optional data
+	 * @param   mixed    callback   Transaction or Callback function
+	 * @param   mixed    force      Force the command to execute, even if connection is not established
+	 */
+	command : function(command, args, data, callback, force) {
+
+		if (!this.state.connected && !force) {
+			this.log('not connected');
+			return;
+		}
+
+		var args = {
+			command : command,
+			args : args,
+			data : data
+		};
+
+		var trans = new Transaction(args, callback);
+
+		this.state.transactions[trans.id] = trans;
+
+		this.state.commandQueue.push(trans);
+
+		if (!this.state.currentCommand) {
+			this.nextCommand();
+		}
+	},
+
+	/**
+	 *
+	 */
+	nextCommand : function() {
+
+		if (this.state.commandQueue.length == 0) {
+			return;	
+		}
+
+		var trans = this.state.commandQueue.shift();
+		this.state.currentCommand = trans;
+
+		this.log('send', JSON.stringify(trans.args));
+
+		var data = $.ajax({
+			url : "command.php",
+			type : 'post',
+			data : trans.args
+		});
+
+		trans.sent = 1;
+	},
+
+	/**
+	 * Handle response
+	 *
+	 * @param   object   data   Response object
+	 */
+	handleResponse : function(data) {
+		//this.log('response', JSON.stringify(data));
+
+		//no current connections
+		if (!data || !data.connected) {
+			if (this.state.connected) {
+				this.log('disconnected', this.state.connected);
+				this.reset();
+			}
+			return;
+		}
+
+		//new connection != old connection
+		if (this.state.connected && data.connected != this.state.connected) {
+			this.log('disconnected', this.state.connected);
+			this.reset();
+		}
+
+		//new connection
+		if (!this.state.connected) {
+			var newconnection = true;
+
+			this.log('connected', data.connected);
+			this.state.connected = data.connected;
+		}
+		
+		//if there's no queue, this means it's the initial status check
+		if (!data.queue) {
+			if (newconnection) {
+				this.command('status', null, null, Debugger.handleStatus);
+			}
+			return;
+		}
+
+		var transactions = this.state.transactions;
+		var queue = this.state.commandQueue;
+
+		for (var i = 0; i < data.queue.length; i++) {
+			var res = data.queue[i];
+
+			//throw away anything before an init packet
+			if (res.name == 'init') {
+				this.handleInit(res);
+				newconnection = false;
+				continue;
 			}
 
-			if (typeof this['action_' + msg.action] == 'function') {
-				this.log('received', msg.action);
-				this['action_' + msg.action](msg.data);	
+			var tid = res.attributes.transaction_id;
+			if (transactions[tid]) {
+				transactions[tid].received = true;
+				transactions[tid].exec(this, res);
+				delete transactions[tid];
 			}
 		}
+
+		if (this.state.currentCommand && this.state.currentCommand.received) {
+			//console.log('currentCommand fulfilled');
+			this.state.currentCommand = null;
+			//console.log(queue.length + ' items in queue');
+			this.nextCommand();
+			return;
+		}
+
+	},
+
+	/**
+	 * Reset all state
+	 */
+	reset : function() {		
+
+		this.state = {
+			connected : null,
+			status : null,
+			features : {},
+			transactions : {},
+			commandQueue : [],
+			file : '',
+			line : 0,
+			breakpoints : null,
+			source : ''
+		};
+
+		this.updateStatus('disconnected');
 	},
 
 	/**
@@ -94,28 +268,443 @@ Debugger = {
 	 *
 	 * @param   object   init   Init packet
 	 */
-	handleInit : function(init) {
-		this.connected[init.thread] = init;
-		init.features = [];
-		init.requests = [];
-		this.log('init', init.thread);
+	handleInit : function(res) {
+
+		this.state.info = res.attributes;
+		this.state.breakpoints = [];
+
+		this.state.file = this.state.info.fileuri;
+		this.updateFile(this.state.file);
+
+		this.log('init', this.state.info);
+
+		var features = ['language_supports_threads', 'language_name', 'language_version', 'encoding',
+		                'protocol_version', 'supports_async', 'data_encoding', 'breakpoint_languages',
+		                'breakpoint_types', 'multiple_sessions', 'max_children', 'max_data', 'max_depth'];
+
+		for (var i = 0; i < features.length; i++) {
+			this.command('feature_get', {n : features[i]}, null, Debugger.handleFeatureGet);
+		}
+
+		this.command('status', null, null, Debugger.handleStatus);
 	},
 
 	/**
-	 * Handle debugger close packet
+	 * Handle debugger feature_get response packet
 	 *
-	 * @param   object   close   Close packet
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
 	 */
-	handleClose : function(close) {
-		delete this.connected[close.thread];
+	handleFeatureGet : function(res, trans) {
+		this.log('feature_get', res.attributes.feature_name + "=" + res.data);
+		this.state.features[res.attributes.feature_name] = res.data;
 	},
 
 	/**
-	 * Update local variables action
+	 * Handle debugger run response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
 	 */
-	action_updateLocal : function(data) {
-		this.updateWatch('inspect-local', data);
+	handleRun : function(res, trans) {
+		this.handleStatus(res, trans);
 	},
+
+	/**
+	 * Handle debugger step_over response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */
+	handleStepOver : function(res, trans) {
+		this.handleStatus(res, trans);
+	},
+
+	/**
+	 * Handle debugger step_into response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */
+	handleStepInto : function(res, trans) {
+		this.handleStatus(res, trans);
+	},
+	
+	/**
+	 * Handle debugger step_out response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */
+	handleStepOut : function(res, trans) {
+		this.handleStatus(res, trans);
+	},
+
+	/**
+	 * Handle debugger status response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */
+	handleStatus : function(res, trans) {
+		this.log('status', res);
+		
+		var status = res.attributes.status;
+
+		this.updateStatus(status);
+
+		switch (status) {
+
+			case 'starting':
+
+				if (!this.state.file) {
+					this.updateSource('Cannot query source until resume executed');
+				} else {
+					this.command('source', {f : this.state.file}, null, Debugger.handleSource);					
+				}
+
+				if (!this.state.breakpoints) {
+					this.state.breakpoints = [];
+					this.command('breakpoint_list', null, null, Debugger.handleBreakpointList);
+				} else {
+					this.updateBreakpoints();
+				}
+
+				break;
+
+			case 'break':
+
+				if (!this.state.breakpoints) {
+					this.command('breakpoint_list', null, null, Debugger.handleBreakpointList);
+				}
+
+				if (res.children.length) {
+
+					var breakinfo = res.children[0].attributes;
+
+					//update line number
+					if (this.state.line != breakinfo.lineno) {
+						this.state.line = breakinfo.lineno;
+					}
+
+					//update file
+					if (this.state.file != breakinfo.filename) {				
+						this.state.file = breakinfo.filename;
+						this.updateFile(this.state.file);
+						this.command('source', {f : this.state.file}, null, Debugger.handleSource);					
+					} else {
+						this.updateLine(this.state.line);						
+					}
+
+				} else {
+					this.state.file = '';
+					this.updateSource('', 0);
+					this.updateFile(this.state.file);
+				}
+
+				this.command('stack_get', null, null, Debugger.handleStackGet);
+				this.command('context_get', null, null, Debugger.handleContextGet);
+				break;
+
+			case 'stopping':
+				this.updateSource('');
+				break;
+		}
+	},
+
+	/**
+	 * Handle debugger source response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */
+	handleSource : function(res, trans) {
+
+		this.log('source', res.data);
+
+		this.state.source = res.data;
+
+		this.updateSource(this.state.source);
+		this.updateLine(this.state.line);
+
+		var breakpoints = this.state.breakpoints[this.state.file];
+		if (breakpoints) {
+			for (var i in breakpoints) {
+				editor.session.setBreakpoint(breakpoints[i].line - 1);
+			}
+		}
+	},
+
+	/**
+	 * Handle debugger breakpoint_set response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */
+	handleBreakpointSet : function(res, trans) {
+
+		var breakpoint = this.state.breakpoints[trans.args.args.f][trans.args.args.n];
+
+		breakpoint.id = res.attributes.id;
+
+		this.log('breakpoint_set', breakpoint);
+	},
+
+	/**
+	 * Handle debugger breakpoint_remove response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */
+	handleBreakpointRemove : function(res, trans) {
+		this.log('breakpoint_remove', res);
+	},
+
+	/**
+	 * Handle debugger breakpoint_list response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */
+	handleBreakpointList : function(res, trans) {
+		this.log('breakpoint_list', res);
+		
+		this.state.breakpoints = [];
+
+		for (var i = 0; i < res.children.length; i++) {
+			var node = res.children[i];
+
+			var breakpoint = {
+				type : node.attributes.type,
+				file : node.attributes.filename,
+				line : node.attributes.lineno
+			};
+
+			if (!this.state.breakpoints[breakpoint.file]) {
+				this.state.breakpoints[breakpoint.file] = {};	
+			}
+
+			this.state.breakpoints[breakpoint.file][breakpoint.line] = breakpoint;
+		}
+
+		this.updateBreakpoints();
+	},
+
+	/**
+	 * Handle debugger context_get response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */	
+	handleContextGet : function(res, trans) {
+		this.log('context_get', res);
+
+		//populate context pane
+		this.updateContext(null);
+		for (var i = 0; i < res.children.length; i++) {
+			this.updateContext(res.children[i]);			
+		}
+	},
+
+	/**
+	 * Handle debugger stack_get response packet
+	 *
+	 * @param   object   res     Response
+	 * @param   object   trans   Transaction
+	 */	
+	handleStackGet : function(res, trans) {
+		this.log('stack_get', res);
+
+		var stack = res.children;
+
+		//need to get current file info
+		if (this.state.file == '') {
+			var current = stack[0].attributes;
+			this.state.file = current.filename;
+			this.state.line = current.lineno;
+			this.updateFile(this.state.file);
+			this.command('source', {f : this.state.file}, null, Debugger.handleSource);
+		}
+
+		//populate stack pane
+		this.updateStack(null);
+		for (var i = 0; i < stack.length; i++) {
+			this.updateStack(stack[i]);			
+		}
+	},
+
+
+
+
+
+
+
+
+
+	/**
+	 * Update status display
+	 *
+	 * @param   string   status   Status text
+	 */
+	updateStatus : function(status) {
+		$('#' + this.options.elements.state).text(status);		
+	},
+
+	updateFile : function(file) {
+		filepath = file.replace('file://', '');
+		if (filepath.indexOf(this.globalState.filePrefix) == 0) {
+			filepath = filepath.substr(this.globalState.filePrefix.length);
+		}
+	
+		$('#' + this.options.elements.file).val(filepath);
+	},
+
+	/**
+	 * Update source code in editor
+	 *
+	 * @param   string   source   Source code
+	 */
+	updateSource : function(source) {
+		editor.setValue(source);
+		editor.setReadOnly(true);
+		editor.clearSelection();
+	},
+
+	/**
+	 * Update line number in editor
+	 *
+	 * @param   int   line   Line number	 
+	 */
+	updateLine : function(line) {
+		editor.gotoLine(line, 0);
+		editor.scrollToLine(line, true);		
+	},
+
+	/**
+	 * Update breakpoints displayed
+	 */
+	updateBreakpoints : function() {
+
+		editor.session.clearBreakpoints();
+
+		var file = this.state.file;
+		if (this.state.breakpoints[file]) {
+
+			var breakpoints = this.state.breakpoints[file];
+			for (var i in breakpoints) {
+				editor.session.setBreakpoint(breakpoints[i].line - 1);	
+			}
+		}
+
+	},
+
+	/**
+	 * Update context pane
+	 *
+	 * @param   object   property   Property object
+	 */
+	updateContext : function(property) {
+		
+		if (!property) {
+			var table = $('<table width="100%" />');
+			$('#' + this.options.elements.context).html(table);
+			return;
+		}
+
+		//get html as tr for property
+
+		var tree = this.inspector.makeTree(property);
+		var html = this.inspector.treeHtml(tree, 0);
+		
+		$('#' + this.options.elements.context + ' table').append(html);
+	
+		console.log(property);
+	},
+
+	/**
+	 * Update stack pane
+	 *
+	 * @param   object   frame   Stack frame object
+	 */
+	updateContext : function(frame) {
+
+		if (!frame) {
+			var table = $('<table width="100%" />');
+			$('#' + this.options.elements.stack).html(table);
+			return;
+		}
+
+		//get html as tr for property
+
+		var tree = this.inspector.makeTree(frame);
+		var html = this.inspector.treeHtml(tree, 0);
+		
+		$('#' + this.options.elements.context + ' table').append(html);
+	
+		console.log(property);
+	},
+
+
+
+	getSource : function() {
+
+		/*
+		editor.setValue(res.data);
+		editor.setReadOnly(true);
+		editor.clearSelection();
+		*/
+
+		var file = $('#' + this.options.elements.file).val();
+
+		if (file.indexOf('/') == 0) {
+			file = 'file://' + file;	
+		} else {
+			file = 'file://' + this.globalState.filePrefix + file;	
+		}
+
+		this.state.file = file;
+		this.updateFile(this.state.file);
+
+		this.command('source', {f : file}, null, Debugger.handleSource);
+	},
+
+	setBreakpoint : function(line) {
+
+		if (!this.state.breakpoints[this.state.file]) {
+			this.state.breakpoints[this.state.file] = {};	
+		}
+
+		var breakpoint = {
+			type : 'line',
+			file : this.state.file,
+			line : line
+		};
+
+		this.state.breakpoints[breakpoint.file][breakpoint.line] = breakpoint;
+
+		this.command('breakpoint_set', {t : breakpoint.type, f : breakpoint.file, n : breakpoint.line}, null, Debugger.handleBreakpointSet);
+	},
+
+	clearBreakpoint : function(line) {
+
+		if (!this.state.breakpoints[this.state.file]) {
+			return;
+		}
+
+		var breakpoint = this.state.breakpoints[this.state.file][line];
+		
+		delete this.state.breakpoints[this.state.file][line];
+
+		if (breakpoint) {
+			this.command('breakpoint_remove', {d : breakpoint.id}, null, Debugger.handleBreakpointRemove);
+		}
+		
+	},
+
+
+
+
+
 
 	/**
 	 * Update watch variables action
@@ -138,345 +727,14 @@ Debugger = {
 		this.updateWatch('inspect-defines', data);
 	},
 
-	/**
-	 * Update stack frames
-	 */
-	action_updateStack : function(data) {
-		this.updateWatch('inspect-stack', data);
-	},
-
-	/**
-	 * Update source pane
-	 */
-	action_updateSource : function(src) {
-		editor.setValue(src.text);
-		editor.setReadOnly(true);
-		editor.clearSelection();
-		editor.gotoLine(src.line, 0);
-		editor.scrollToLine(src.line, true);
-	},
-
-	action_log : function(data) {
-
-		var uid = this.uid++;
-		$('#console-container').append('<div class="watch" id="console-' + uid + '" />');
-		var watch = {};
-		watch.name = '';
-		watch.type = 'object';
-		watch.className = 'object';
-		watch.children = [data];
-
-		this.updateWatch('console-' + uid, watch);
-	},
-	
-	action_describe : function(data) {
-		var row = this.replaceWatch(data[1], data[0]);
-		var button = $(row).find('.watch-toggle');
-		this.toggleWatch(button);
-	},
-	
-	updateWatch : function(id, data, append) {
-		var table = $('<table width="100%" />');
-		if (append) {
-			$('#' + id).append(table);
-		} else {
-			$('#' + id).html(table);
-		}
-
-		var tree = this.makeTree(data);
-		for (var i = 0; i < tree.children.length; i++) {
-			table.append(this.treeHtml(tree.children[i], 0));
-		}
-	},
-
-	replaceWatch : function(id, data) {
-		
-		var table = $('<table width="100%" />');
-
-		var tree = this.makeTree(data);
-		table.append(this.treeHtml(tree, 0));
-		
-		var rows = $(table).find('tr.watch_row');
-
-		$('.' + id + '_child').remove();
-		var me = $('.' + id);
-		me.after(rows);
-		me.remove();
-
-		return rows[0];
-	},
-
-	/**
-	 *
-	 */
-	toggleWatch : function(button) {
-		var state, el, reload;
-
-		el = $(button).closest('tr.watch_row')[0];
-
-		state = !$(button).hasClass('watch-toggle-open');
-
-		if (state) {
-			$(button).addClass('watch-toggle-open');
-			$(el).removeClass('inactive').addClass('active');
-		} else {
-			$(button).removeClass('watch-toggle-open');
-			$(el).removeClass('active').addClass('inactive');			
-		}
-
-		reload = $(el).find('.describe')[0];
-		if (reload) {
-			var ctx = $(reload).attr('rel');
-			this.command('describe', ctx + ' ' + el.id);
-		}
-
-		this.toggleChildren(el, state);
-	},
-
-	/**
-	 *
-	 */
-	toggleChildren : function(el, state) {
-
-		var child_class = el.id + '_child';
-		var children = $('.' + child_class);
-
-		children.each(function(i, el) {
-			
-			if (state) {
-				$(el).css('display', 'table-row');	
-			} else {
-				$(el).css('display', 'none');	
-			}
-
-			var active = $(el).hasClass('active');
-
-			if (active) {
-				Debugger.toggleChildren(el, state);
-			}
-		});
-	},
-
-	treeHtml : function(tree, depth, parentid) {
-		var out = "";
-		var uid = this.uid++;
-
-		var indent = depth * 20  + 10;
-
-		if (depth == 0) {
-			out += '<tr class="watch_row watch_row_' + uid + ' watch-top inactive" id="watch_row_' + uid + '">';
-		} else {
-			out += '<tr class="watch_row watch_row_' + uid + ' watch_row_' + parentid + '_child inactive" id="watch_row_' + uid + '" style="display:none">';
-		}
-
-		out += '<td style="padding-left:' + indent + 'px;"><span>';
-		if (tree.children.length) {
-			out += '<span class="watch-toggle" onclick="Debugger.toggleWatch(this);"></span>';
-		}
-
-		out += '<span><span class="watch-name">' + tree.name + '</span></span></td>';
-		out += '<td>' + tree.display + '</td>';
-		
-		if (depth == 0) {
-			//out += '<td class="watch-close"><span>&times;</span></td>';	
-		}
-		
-		out += '</tr>';
-
-		for (var i = 0; i < tree.children.length; i++) {
-			out += this.treeHtml(tree.children[i], depth + 1, uid);
-		}
-
-		return out;
-	},
-
-	makeString : function(str) {
-		return jQuery('<div />').text(str).html();
-	},
-	
-	makeTree : function(data) {
-
-		var node = {};
-
-		//value display
-		node.display = data;
-		node.short = data.value;
-		node.name = this.makeString(data.name);
-
-		//
-		node.children = [];
-		for (var i in data.children) {
-			node.children[i] = this.makeTree(data.children[i]);
-			if (data.type == 'array') {
-				node.children[i].name = '<span class="watch-key-array">' + node.children[i].name + '</span>';
-			}
-		}
-
-		if (data.access == 'protected') {
-			node.name = '<span class="watch-protected">' + node.name + '</span>';			
-		}
-
-		if (data.access == 'private') {
-			node.name = '<span class="watch-private">' + node.name + '</span>';			
-		}
-		
-		if (data.extension) {
-			node.name = '<span class="watch-extension">' + node.name + '</span>';	
-		}
-
-		//get html by type
-		switch (data.type) {
-
-			case 'NULL':
-				node.display = '<span class="watch-null">null</span>';
-				node.short = node.display;
-				break;
-
-			case 'boolean':
-				node.display = '<span class="watch-boolean">' + data.value + '</span>';
-				node.short = node.display;
-				break;
-
-			case 'integer':
-			case 'double':
-				var value = data.value;
-				if (data.value == 'Infinity') {
-					value = Infinity;
-				}
-				if (data.value == 'NaN') {
-					value = NaN;	
-				}
-	
-				node.display = '<span class="watch-number">' + value + '</span>';
-				node.short = node.display;
-				break;
-
-			case 'string':
-				var value = this.makeString(data.value);
-				var full = '<span class="watch-string">' + value + '</span>';
-				var short_str;
-
-				if (value.length > 80) {
-					node.children = [{name : "", display : full, children : []}];
-					short_str = value.substr(0, 30) + ' &hellip; ' + value.substr(value.length - 30);
-					short_str = short_str.replace(/\s/, '&nbsp;');
-					node.display = '<span class="watch-string watch-string-short">' + short_str + '</span>';
-				} else {
-					node.display = full;
-				}
-
-				if (value.length > 12) {
-					short_str = value.substr(0, 8) + ' &hellip; ';
-					short_str = short_str.replace(/\s/, '&nbsp;');
-					node.short = '<span class="watch-string watch-string-short">' + short_str + '</span>';
-				} else {
-					node.short = full;
-				}
-
-				break;
-
-			case 'file':
-				var full = '<span class="watch-file">' + data.value.file + ' (line ' + data.value.line + ')</span>';
-
-				var onclick = "Debugger.command('source', '" + data.value.file.replace(/("')/, '\\$1') + " " + data.value.line + "')";
-				node.display = '<span class="watch-file" onclick="' + onclick + '">' + data.value.name + ' (line ' + data.value.line + ')</span>';
-				node.short = node.display;
-				node.children.unshift({name : "", display : full, children : []});
-				break;
-
-			case 'comment':
-				var value = this.makeString(data.value);
-				node.name = '<span class="watch-comment-name">' + node.name + '</span>';	
-				node.display = '<span class="watch-comment">' + value + '</span>';
-				node.short = node.display;
-				break;
-
-			case 'resource':
-				node.display = '<span class="watch-object">Resource ( ' + data.res_type + '</span>, <span class="watch-object">' + data.value + ' )</span>';
-				node.short = node.display;
-				break;
-
-			case 'hash':
-
-				var display = [];
-				for (var j = 0; j < node.children.length && j < 3; j++) {
-					display.push('<span class="watch-short-key">' + node.children[j].name + '=</span>' + node.children[j].short);
-				}
-
-				if (j < data.total) {
-					display.push('<span class="watch-arraymore">' + (data.total - j) + ' more&hellip;</span>');	
-				}
-
-				node.display = '<span class="watch-array">{</span> ' + display.join(", ") + ' <span class="watch-array">}</span>';
-				node.short = '<span class="watch-object">Array</span>';
-
-				break;
-
-			case 'array':
-
-				var display = [];
-				for (var j = 0; j < node.children.length && j < 3; j++) {
-					display.push(node.children[j].short);					
-				}
-
-				if (j < data.total) {
-					display.push('<span class="watch-arraymore">' + (data.total - j) + ' more&hellip;</span>');	
-				}
-
-				node.display = '<span class="watch-array">[</span> ' + display.join(", ") + ' <span class="watch-array">]</span>';
-				node.short = '<span class="watch-object">Array</span>';
-
-				break;
-
-			case 'object':
-
-				var classname = data.classname;
-
-				var display = [];
-				for (var j = 0; j < node.children.length && j < 3; j++) {
-					display.push('<span class="watch-short-key">' + node.children[j].name + '=</span>' + node.children[j].short);
-				}
-
-				if (j < node.children.length) {
-					display.push('<span class="watch-arraymore">more&hellip;</span>');	
-				}
-
-				node.display = '<span class="watch-object">' + classname + ' {</span> ' + display.join(", ") + ' <span class="watch-object">}</span>';
-				node.short = '<span class="watch-object">{&hellip;}</span>';
-				break;
-
-			case 'function':
-				node.name = '<span class="watch-key-function">' + node.name + '</span>';
-				if (!node.children.length) {
-					node.display = '<span class="watch-function describe" rel="function ' + data.name + '">function()</span>';
-					node.children = [{name : '<div class="loading"></div>', display : "", children : []}];
-				} else {
-					node.display = '<span class="watch-function">function()</span>';					
-				}
-				node.short = '<span class="watch-function">function()</span>';
-				break;
-
-			case 'class':
-				node.name = '<span class="watch-key-class">' + node.name + '</span>';
-				if (!node.children.length) {
-					node.display = '<span class="watch-class describe" rel="class ' + data.name + '">Class</span>';
-					node.children = [{name : '<div class="loading"></div>', display : "", children : []}];
-				} else {
-					node.display = '<span class="watch-class">Class</span>';
-				}
-				node.short = 'Class';
-				break;
-
-			default:
-				node.display = data.value;
-		}
-
-		return node;
-	}
 
 };
 
 
 }(jQuery));
 
-jQuery().ready(Debugger.updater);
+jQuery().ready(function() {
+	Debugger.reset();
+	Debugger.checker();
+});
+

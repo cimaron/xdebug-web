@@ -1,4 +1,4 @@
-<?
+<?php
 /*
 Copyright (c) 2013 Cimaron Shanahan
 
@@ -20,49 +20,22 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-?>
-<div id="console-pane">
+require_once 'include/dbgp.php';
+require_once 'include/functions.php';
 
-	<div id="toolbar" class="ui-widget-header ui-corner-all">
-		<button id="console-button-clear" onClick="Debugger.clear_console();"><img src="/assets/img/icons/cross-script.png" alt="clear" /></button>
 
-		<input type="checkbox" name="console-checkbox-persist" id="console-checkbox-persist" />
-		<label for="console-checkbox-persist" />Persist
-	</div>
-	
-	<div id="console-container">
-	</div>
-</div>
+$connection = get_connection();
+if (!$connection) {
+	$info = array(
+		'disconnected' => true,
+	);
+} else {
+	$info = array(
+		'connected' => $connection,
+	);
+}
 
-<script type="text/javascript">
+header('Content-Type: application/json');
+ob_start('ob_gzhandler');
+echo json_encode($info);
 
-(function($) {
-
-	function resize() {
-		var pane = $('#console-pane');
-		pane.height('100%');
-		var con = $('#console-container');
-
-		con.height(0);
-
-		var newheight =  pane.height() - (con.offset().top - pane.offset().top);
-		con.height(newheight);
-	}
-
-	WindowLayout.options.center.childOptions.south.childOptions.center.onresize = function() {
-		resize();
-		return true;
-	};
-
-	$().ready(function() {
-		$('#console-pane .button').button();
-		$('#console-checkbox-persist').button();
-		resize();
-	});
-
-	Debugger.clear_console = function() {
-		$('#console-container').html('');
-	}
-
-}(jQuery));
-</script>

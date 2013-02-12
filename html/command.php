@@ -20,11 +20,27 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-include 'include/dbgp.php';
+require_once 'include/dbgp.php';
+require_once 'include/functions.php';
 
-$command = preg_replace('#[^a-z_]#', '', $_REQUEST['command']);
-$data = $_REQUEST['data'];
-$tid = (int)$_REQUEST['tid'];
+$connection = get_connection();
+if (!$connection) {
+	$info = array(
+		'disconnected' => true,
+	);
+} else {
 
-$dbgp = new DBGp(DBGp::CTX_IDE);
-$dbgp->sendCommand("$command -i $tid " . base64_encode($data));
+	$command = get_command($_REQUEST['command'], $_REQUEST['tid'], $_REQUEST['args'], $_REQUEST['data']);
+
+	$dbgp = new DBGp(DBGp::CTX_IDE, $connection);
+	$dbgp->sendCommand($command);
+
+	$info = array(
+		'connected' => $connection,
+	);
+}
+
+header('Content-Type: application/json');
+ob_start('ob_gzhandler');
+echo json_encode($info);
+

@@ -20,29 +20,22 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+require_once 'include/dbgp.php';
+require_once 'include/functions.php';
+
+$connection = get_connection();
+if (!$connection) {
+	sleep(2);
+	$info = array(
+		'connected' => false,
+	);
+} else {
+	$info = array();
+	$info['queue'] = get_queue($connection);
+	$info['connected'] = get_connection();
+}
+
 header('Content-Type: application/json');
-
-include 'include/dbgp.php';
-
-
-$dbgp = new DBGp(DBGp::CTX_IDE);
-
-$max_sleep = 4;
-$start = time();
-$current = 0;
-
-$queue = $dbgp->getData();
-
-while (empty($queue) && $current < $max_sleep) {
-	usleep(100);
-	$queue = $dbgp->getData();
-	$current = time() - $start;
-}
-
-foreach ($queue as $i => $item) {	
-	$queue[$i] = json_decode($item);
-}
-
 ob_start('ob_gzhandler');
-echo json_encode($queue);
+echo json_encode($info);
 

@@ -49,6 +49,24 @@ class PHPDebugger {
 		'domain' => 'http://debugger.cimaron.vm',
 	);
 
+	protected $status = '';
+
+	protected $features = array(
+		'language_supports_threads' => 0,
+		'language_name' => 'PHP',
+		'language_version' => phpversion(),
+		'encoding' => 'ASCII', //how should we get the correct value here?
+		'protocol_version' => '1',
+		'supports_async' => '0'
+		'data_encoding' => 'base64',
+		'breakpoint_languages' => 'PHP',
+		'breakpoint_types' => 'exception',
+		'multiple_sessions' => '0',
+		'max_children' => '32',
+		'max_data' => '1024',
+		'max_depth' => '1',
+	);
+
 	/**
 	 * Get instance of debugger
 	 *
@@ -79,17 +97,33 @@ class PHPDebugger {
 		//throw away all stale commands
 		$this->dbgp->getCommands();
 
+		$this->status = 'starting';
+
 		$this->dbgp->sendData(DBGpPacket::init());
 
 		set_error_handler(array($this, 'error'), E_ALL & ~E_NOTICE);
+
+		//pause to let the IDE negotiate features
+		$this->pause();
+
+		//note that while we set status as 'running' here for correctness, without async support this will never, ever be able to be seen by the IDE
+		$this->status = 'running';
 	}
 
 	/**
 	 * Destructor
 	 */
 	public function __destruct() {
+
+		$this->status = 'stopping';
+
+		//should we add a pause here to allow collection of metrics?
+
 		$this->dbgp->sendData(DBGpPacket::close());
+
+		$this->status = 'stopped';
 	}
+
 
 	public function setConfig($key, $value) {
 		$this->config[$key] = $value;
@@ -133,7 +167,7 @@ class PHPDebugger {
 
 			$log->children[] = new PHPDebuggerNode('message', 'string', $err->errstr);
 
-			$this->dbgp->sendData(DBGpPacket::response('log', $log));
+			//$this->dbgp->sendData(DBGpPacket::response('log', $log));
 		}
 	}
 
@@ -143,7 +177,7 @@ class PHPDebugger {
 	public function log() {
 		foreach (func_get_args() as $data) {
 			$inspect = $this->inspector->inspect($data);
-			$this->dbgp->sendData(DBGpPacket::response('log', $inspect));
+			//$this->dbgp->sendData(DBGpPacket::response('log', $inspect));
 		}
 	}
 
@@ -174,7 +208,9 @@ class PHPDebugger {
 			$tree = $vars;
 		}
 
-		$this->dbgp->sendData(DBGpPacket::response($action, $tree));
+		
+
+		//$this->dbgp->sendData(DBGpPacket::response($action, $tree));
 	}
 
 	/**
@@ -330,6 +366,8 @@ class PHPDebugger {
 			return;
 		}
 
+		$this->status = 'break';
+
 		if ($new) {
 			$this->dirty = true;
 			$this->defines = $this->buildDefines();
@@ -355,9 +393,8 @@ class PHPDebugger {
 			} else {
 				$text = "Could not load $src";
 			}
-			
-			$this->dbgp->sendData(DBGpPacket::response('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
-		//	exit;
+
+			//$this->dbgp->sendData(DBGpPacket::response('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
 		}
 
 		return $this->pause();
@@ -375,15 +412,19 @@ class PHPDebugger {
 
 		$parsed = new stdClass;
 		$parsed->command = $parts[0];
-		$parsed->data = array();
+		$parsed->data = NULL;
 
 		for ($i = 1; $i < count($parts); $i++) {
+
+			if ($parts[$i] == '--') {
+				$parsed->data = $parts[$i + 1];
+				break;
+			}
+
 			if ($parts[$i][0] == '-') {
 				$key = substr($parts[$i], 1);
 				$parsed->$key = $parts[$i + 1];
 				$i++;
-			} else {
-				$parsed->data[] = base64_decode($parts[$i]);
 			}
 		}
 
@@ -400,26 +441,43 @@ class PHPDebugger {
 		while (time() - $start < $this->config['timeout']) {
 			set_time_limit(60);
 			$queue = $this->dbgp->getCommands();
-
 			foreach ($queue as $msg) {
 
 				$command = $this->parseCommand($msg);
-
+				
 				switch ($command->command) {
 
-					case 'halt':
-						die("Terminated by debugger");
+					case 'feature_get':
+						$this->cmdFeatureGet($command);
+						break;
 
-					case 'reload':
-						/*echo '<script type="text/javascript">location.reload();</script>';*/
+					case 'feature_set':
+						$this->cmdFeatureGet($command);
+						break;
+
+					case 'run':
+						$this->cmdRun($command);
+						return array();
+						break;
+
+					case 'status':
+						$this->cmdStatus($command);
+						break;
+
+					case 'stop':
+						$this->cmdStop($command);
+						break;
+
+					case 'step_into':
+					case 'step_over':
+					case 'step_out':
+					case 'detach':
+						$this->cmdUnknown($command);
 						break;
 
 					case 'exec':
 						return array($command->data[0]);
 						break;
-
-					case 'resume':
-						return array();
 
 					case 'get':
 						$this->send($command->data[0]);
@@ -436,7 +494,7 @@ class PHPDebugger {
 							$node = $this->inspector->describeFunction($name);
 						}
 
-						$this->dbgp->sendData(DBGpPacket::response('describe', array($node, $return)));
+						//$this->dbgp->sendData(DBGpPacket::response('describe', array($node, $return)));
 						break;
 
 					case 'source':
@@ -447,7 +505,7 @@ class PHPDebugger {
 						if ($text === false) {
 							$text = "Could not load $src";
 						}
-						$this->dbgp->sendData(DBGpPacket::response('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
+						//$this->dbgp->sendData(DBGpPacket::response('updateSource', array('text' => utf8_encode($text), 'line' => $line)));
 						break;
 				}
 			}
@@ -501,8 +559,139 @@ class PHPDebugger {
 		}
 		return $newvars;
 	}
-	
-	
+
+	/**
+	 * Respond to unknown command
+	 */
+	protected function cmdUnknown($command) {
+
+		$packet = DBGpPacket::error($command->command, $command->i, DBGpPacket::ERROR_NOT_IMPLEMENTED, "unknown command");
+
+		$this->dbgp->sendData($packet);
+	}
+
+	/**
+	 * Execute debugger 'feature_get' command
+	 */
+	protected function cmdFeatureGet($command) {
+
+		$feature = $command->n;
+
+		$supported = isset($this->features[$feature]);
+		$value = $supported ? $this->features[$feature] : '0';
+
+		$packet = DBGpPacket::response('feature_get', $command->i, array(
+			'feature_name' => $feature,
+			'supported' => $supported
+		), $value);
+
+		$this->dbgp->sendData($packet);
+	}
+
+	/**
+	 * Execute debugger 'feature_set' command
+	 */
+	protected function cmdFeatureSet($command) {
+
+		$features = array(
+			'multiple_sessions' => array('0', '1'),
+			'encoding' => array('ASCII', 'ISO-8859-X', 'UTF-8'),
+			'max_children' => '#[0-9]+#',
+			'max_data' => '#[0-9]+#',
+			'max_depth' => '#[0-9]+#',
+		);
+
+		$name = $command->n;
+		$value = $command->v;
+
+		if (!isset($features[$name])) {
+			
+			$packet = DBGpPacket::error('feature_set', $command->i, array(
+				'status' => $this->status,
+				'reason' => 'ok',
+			), ERROR_INVALID_OPTIONS, "Invalid or missing options");
+			
+		} else {
+			
+			$success = true;
+			$check = $features[$name];
+
+			if (is_array($check) && in_array($value, $check)) {
+				$success = true;
+			}
+			
+			if (is_string($check) && preg_match($check, $value)) {
+				$success = true;
+			}
+			
+			if (!$success) {
+
+				//@todo: specify exact error
+
+				$packet = DBGpPacket::error('feature_set', $command->i, array(
+					'status' => $this->status,
+					'reason' => 'ok',
+				), DBGpPacket::ERROR_INTERNAL_EXCEPTION, "Invalid value");
+				
+			} else {
+
+				$this->features[$name] = $value;
+			
+				$packet = DBGpPacket::response('feature_set', $command->i, array(
+					'feature' => $name,
+					'success' => '1',
+				), DBGpPacket::ERROR_INTERNAL_EXCEPTION, "Invalid value");				
+			
+			}
+			
+		}
+
+		$this->dbgp->sendData($packet);
+	}
+
+	/**
+	 * Execute debugger 'status' command
+	 */
+	protected function cmdStatus($command) {
+
+		$packet = DBGpPacket::response('status', $command->i, array(
+			'status' => $this->status,
+			'reason' => 'ok',
+		));
+
+		$this->dbgp->sendData($packet);
+	}
+
+	/**
+	 * Execute debugger 'run' command
+	 */
+	protected function cmdRun($command) {
+
+		$packet = DBGpPacket::response('run', $command->i, array(
+			'status' => $this->status,
+			'reason' => 'ok',
+		));
+
+		$this->dbgp->sendData($packet);
+	}
+
+	/**
+	 * Execute debugger 'stop' command
+	 */
+	protected function cmdStop() {
+
+		$this->status = 'stopped';
+
+		$packet = DBGpPacket::response('stop', $command->i, array(
+			'status' => $this->status,
+			'reason' => 'ok',
+		));
+
+		$this->dbgp->sendData($packet);
+
+		die();
+	}
+
 }
 
 eval('
