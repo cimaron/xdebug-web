@@ -35,6 +35,7 @@ include dirname(__FILE__) . '/include/config.php';
 	<script src="assets/js/jquery-1.8.2-uncompressed.js"></script>
 	<script src="assets/js/jquery-ui-1.10.0.custom.js"></script>
 	<script src="assets/js/jquery.layout.js"></script>
+	<script src="assets/js/jquery.cookie.js"></script>
 	<script>
 		//Initialize this here so our subpanes can modify the configuration before loading
 		WindowLayout = {};
@@ -51,6 +52,9 @@ include dirname(__FILE__) . '/include/config.php';
 			east : {
 				size : '40%'
 			},
+			west : {
+				size : '15%'
+			},
 			center : {
 				paneSelector : ".outer-center",
 				childOptions : {
@@ -59,6 +63,7 @@ include dirname(__FILE__) . '/include/config.php';
 					},
 					south : {
 						paneSelector : ".middle-south",
+						initClosed : true,
 						childOptions : {
 							center : {
 								paneSelector : ".inner-center",
@@ -80,6 +85,7 @@ include dirname(__FILE__) . '/include/config.php';
 	</script>
 
 	<script src="assets/js/debugger.js"></script>
+	<script src="assets/js/request.js"></script>
 	<script src="assets/js/inspector.js"></script>
 	
 	<!-- Le styles -->
@@ -94,6 +100,10 @@ include dirname(__FILE__) . '/include/config.php';
 	<h4 style="margin: 4px;">
 		PHP Debugger <? echo VERSION; ?>
 	</h4>
+</div>
+
+<div class="ui-layout-west">
+	<? include 'panes/files.php'; ?>
 </div>
 
 <div class="outer-center">

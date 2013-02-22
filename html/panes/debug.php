@@ -24,6 +24,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 <div id="inspect-pane" class="tabs">
 
+	<div id="loading-indicator" class="loading"></div>
+	
 	<ul>
 		<li rel="local">
 			<a href="#inspect-local"><img src="assets/img/icons/application-tree.png" alt="list" /> Local</span></a>
@@ -40,17 +42,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		<li rel="stack">
 			<a href="#inspect-stack"><img src="assets/img/icons/applications-stack.png" alt="app stack" /> Stack</a>
 		</li>
+		<li rel="breakpoints">
+			<a href="#inspect-breakpoints"><img src="assets/img/icons/breakpoint.png" alt="breakpoints" /> Breakpoints</a>
+		</li>
 	</ul>
 
 	<div id="inspect-panes">
 		<div id="inspect-local" class="watch"></div>
 		<div id="inspect-watch-container">
-			<input type="text" id="addwatch" value="" class="span11" onchange="Debugger.addWatch(this);" placeholder="Enter expression..." />
 			<div id="inspect-watch" class="watch"></div>
+			<input type="text" id="addwatch" value="" class="span11" placeholder="Enter expression..." />
 		</div>
 		<div id="inspect-global" class="watch"></div>
 		<div id="inspect-defines" class="watch"></div>
 		<div id="inspect-stack" class="watch"></div>
+		<div id="inspect-breakpoints" class="watch"></div>
 	</div>
 
 </div>
@@ -79,20 +85,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 		$('.tabs').tabs({
 			activate : function(e, tabs) {
-				var watch = tabs.newTab.attr('rel');
-				$('#inspect-' + watch).html('<div class="loading"></div>');
-				Debugger.command('get', watch);
+				var watch = tabs.newTab.find('a').attr('href');
+				watch = watch.match(/#inspect-([a-z]+)/)[1];
+				Debugger.activeTab(watch);
 			}
 		});
 
 		resize();
-	});
+		
+		$('#addwatch').on("keyup", function(e) {
+			if (e.which == 13) {
+				Debugger.addWatch($(this).val());
+				$(this).val('');
+			}
+		});
 
-	Debugger.addWatch = function(el) {
-		var val = $(el).val();
-		$(el).val('');
-		Debugger.command('exec', val);
-	}
+	});
 
 }(jQuery));
 </script>

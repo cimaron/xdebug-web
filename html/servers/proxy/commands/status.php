@@ -21,9 +21,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 
-include dirname(__FILE__) . '/../../include/SocketServer.php';
-include dirname(__FILE__) . '/proxy.php';
+include dirname(__FILE__) . '/include.php';
 
-$proxy = new DBGpProxy('192.168.1.101', 9000);
-$proxy->run();
+$command = new Command('status');
+$result = $command->send();
+
+header('Content-Type: application/json');
+echo $result;
 

@@ -67,7 +67,9 @@ function get_queue($connection) {
 	$dbgp = new DBGp(DBGp::CTX_IDE, $connection);
 
 	$start = time();
-	$timeout = 10;
+
+	$timeout = (int)(isset($_REQUEST['timeout']) ? (int)$_REQUEST['timeout'] : 1);
+	$timeout = max(0, min($timeout, 30));
 
 	$queue = array();
 	while (empty($queue)) {
@@ -82,13 +84,14 @@ function get_queue($connection) {
 			usleep(100);
 		}
 
-		if (time() - $start > $timeout || !connection_status()) {
+		if (time() - $start > $timeout || connection_aborted()) {
 			break;
 		}
 	}
 
 	foreach ($queue as $i => $item) {
-		$xml = simplexml_load_string($item);	
+		$item = str_replace('&#0;', '??', $item);
+		$xml = simplexml_load_string($item);
 		$queue[$i] = xml_to_object($xml);
 	}
 

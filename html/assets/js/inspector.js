@@ -110,104 +110,179 @@ Debugger.inspector = {
 		var child_class = el.id + '_child';
 		var children = $('.' + child_class);
 
-		children.each(function(i, el) {
-			
-			if (state) {
-				$(el).css('display', 'table-row');	
-			} else {
-				$(el).css('display', 'none');	
-			}
+		children.each($.proxy(function(i, el) { this.toggleChild(i, el, state);}, this));
+	},
 
-			var active = $(el).hasClass('active');
+	/**
+	 *
+	 */
+	toggleChild : function(i, el, state) {
 
-			if (active) {
-				Debugger.toggleChildren(el, state);
-			}
-		});
+		if ($(el).hasClass('watch-reload')) {
+			var reload = $(el).data('reload');
+			Debugger.reload(reload.fullname, reload.name, reload.stack_depth, el);
+			return;
+		}
+
+		if (state) {
+			$(el).css('display', 'table-row');	
+		} else {
+			$(el).css('display', 'none');	
+		}
+
+		var active = $(el).hasClass('active');
+
+		if (active) {
+			this.toggleChildren(el, state);
+		}		
 	},
 
 	treeHtml : function(tree, depth, parentid) {
-		var out = "";
+		//var out = "";
 		var uid = this.uid++;
 
 		var indent = depth * 20  + 10;
 
+		var tr = $('<tr>')
+			.addClass('watch_row')
+			.addClass('watch_row_' + uid)
+			.attr('id', 'watch_row_' + uid)
+			.addClass('inactive')
+			.data('uid', uid)
+			.data('depth', depth)
+			.data('parentid', parentid)
+			;
+
+		if (tree.reload) {
+			tr.addClass('watch-reload');
+			tr.data('reload', tree.reload);
+		}
+
 		if (depth == 0) {
-			out += '<tr class="watch_row watch_row_' + uid + ' watch-top inactive" id="watch_row_' + uid + '">';
+			tr.addClass('watch-top');
+			
+			//out += '<tr class="watch_row watch_row_' + uid + ' watch-top inactive" id="watch_row_' + uid + '">';
 		} else {
-			out += '<tr class="watch_row watch_row_' + uid + ' watch_row_' + parentid + '_child inactive" id="watch_row_' + uid + '" style="display:none">';
+			tr.addClass('watch_row_' + parentid + '_child')
+				.css('display', 'none')
+				;
+
+			//out += '<tr class="watch_row watch_row_' + uid + ' watch_row_' + parentid + '_child inactive" id="watch_row_' + uid + '" style="display:none">';
 		}
 
-		out += '<td style="padding-left:' + indent + 'px;"><span>';
+		var td = $('<td>')
+			.appendTo(tr)
+			.css('padding-left', indent)
+			;
+
+		var span = $('<span>')
+			.appendTo(td)
+			;
+		//out += '<td style="padding-left:' + indent + 'px;"><span>';
+
 		if (tree.children.length) {
-			out += '<span class="watch-toggle" onclick="Debugger.inspector.toggleWatch(this);"></span>';
+			$('<span>')
+				.appendTo(span)
+				.addClass('watch-toggle')
+				.attr('onclick', "Debugger.inspector.toggleWatch(this);")
+				;
+			//out += '<span class="watch-toggle" onclick="Debugger.inspector.toggleWatch(this);"></span>';
 		}
 
-		out += '<span><span class="watch-name">' + (depth == 0 ? tree.fullname : tree.name) + '</span></span></td>';
-		out += '<td>' + tree.display + '</td>';
+		span = $('<span>')
+			.appendTo(span)
+			.addClass('watch-name')
+			.html(depth == 0 ? tree.fullname : tree.name)
+			;
+		//out += '<span><span class="watch-name">' + (depth == 0 ? tree.fullname : tree.name) + '</span></span></td>';
+		
+		td = $('<td>')
+			.appendTo(tr)
+			.html(tree.display)
+			;
+		//out += '<td>' + tree.display + '</td>';
 		
 		if (depth == 0) {
 			//out += '<td class="watch-close"><span>&times;</span></td>';	
 		}
 		
-		out += '</tr>';
+		//out += '</tr>';
+
+		var list = [tr];
 
 		for (var i = 0; i < tree.children.length; i++) {
-			out += this.treeHtml(tree.children[i], depth + 1, uid);
+			list = list.concat(this.treeHtml(tree.children[i], depth + 1, uid));
+			//out += this.treeHtml(tree.children[i], depth + 1, uid);
 		}
 
-		return out;
+		return list;
+		//return out;
 	},
 
 	makeString : function(str) {
 		return jQuery('<div />').text(str).html();
 	},
-	
+
 	makeTree : function(data) {
 
-		var node = {};
+		var node = {
+			display : data,
+			short : data.value,
+			name : this.makeString(data.attributes.name),
+			fullname : data.attributes.fullname ? data.attributes.fullname : data.attributes.name,
+			children : []
+		};
 
-		//value display
-		node.display = data;
-		node.short = data.value;
-		node.name = this.makeString(data.attributes.name);
-		node.fullname = data.attributes.fullname;
+		if (this.isAssociativeArray(data)) {
+			data.children.sort(this.sortAssociative);
+		}
 
-		//
-		node.children = [];
-		for (var i in data.children) {
-			node.children[i] = this.makeTree(data.children[i]);
+		for (var i = 0; i < data.children.length; i++) {
+			var child = data.children[i];
+			
+			child.attributes.stack_depth = data.attributes.stack_depth;
+
+			if (data.attributes.type == 'object' && child.attributes.name == 'CLASSNAME') {
+				data.children.splice(i, 1);
+				i--;
+				continue;
+			}
+
+			node.children[i] = this.makeTree(child);
 			if (data.attributes.type == 'array') {
 				node.children[i].name = '<span class="watch-key-array">' + node.children[i].name + '</span>';
 			}
-		}
-
-		if (data.attributes.facet) {
-
-			if (data.attributes.facet == 'protected') {
-				node.name = '<span class="watch-protected">' + node.name + '</span>';			
-			}
-
-			if (data.attributes.facet == 'private') {
-				node.name = '<span class="watch-private">' + node.name + '</span>';			
-			}
 			
-			/*
-			if (data.extension) {
-				node.name = '<span class="watch-extension">' + node.name + '</span>';	
+			if (child.children.length == 0 && child.attributes.numchildren > 0) {
+				//max_depth exceeded
+				node.reload = {
+					fullname : data.attributes.fullname,
+					name : data.attributes.name,
+					stack_depth : data.attributes.stack_depth
+				};
 			}
-			*/
+
 		}
+
+		if (data.children.length != 0 && data.attributes.numchildren > data.children.length) {
+			//max_children exceeded
+			var onclick = "Debugger.getMore('" + this.encodeAttr(node.fullname) + "', this);";				
+			node.children.push({
+				display : '<span class="watch-arraymore-load" rel="1" onclick="' + onclick + '">more&hellip;</span>',
+				short : '',
+				name : '',
+				fullname : 'more',
+				children : []
+			});
+		}
+
 
 		//get html by type
 		switch (data.attributes.type) {
-			case 'uninitialized':
-				node.display = '<span class="watch-null">uninitialized</span>';
-				node.short = node.display;
-				break;
 
 			case 'null':
-				node.display = '<span class="watch-null">null</span>';
+			case 'uninitialized':
+				node.display = '<span class="watch-null">' + data.attributes.type + '</span>';
 				node.short = node.display;
 				break;
 
@@ -255,15 +330,28 @@ Debugger.inspector = {
 				}
 
 				break;
-/*
-			case 'file':
-				var full = '<span class="watch-file">' + data.value.file + ' (line ' + data.value.line + ')</span>';
 
-				var onclick = "Debugger.command('source', '" + data.value.file.replace(/("')/, '\\$1') + " " + data.value.line + "')";
-				node.display = '<span class="watch-file" onclick="' + onclick + '">' + data.value.name + ' (line ' + data.value.line + ')</span>';
+			case 'breakpoint':
+				node.name = data.attributes.breaktype;
+
+			case 'file':
+				var filename = data.attributes.filename;
+				var line = data.attributes.lineno;
+				var full = '<span class="watch-file">' + filename + ' (line ' + line + ')</span>';
+
+				var onclick = "Debugger.getSource('" + filename.replace(/("')/, '\\$1') + "', " + line + ");";
+				filename = filename.replace('file://' + Debugger.state.docroot, '');
+				
+				node.display = '<span class="watch-file" onclick="' + onclick + '">' + filename + ' (line ' + line + ')</span>';
 				node.short = node.display;
+				if (data.attributes.where) {
+					node.name = data.attributes.where;
+				}
+				node.fullname = node.name;
+
 				node.children.unshift({name : "", display : full, children : []});
 				break;
+/*
 
 			case 'comment':
 				var value = this.makeString(data.value);
@@ -271,14 +359,15 @@ Debugger.inspector = {
 				node.display = '<span class="watch-comment">' + value + '</span>';
 				node.short = node.display;
 				break;
+*/
 
 			case 'resource':
-				node.display = '<span class="watch-object">Resource ( ' + data.res_type + '</span>, <span class="watch-object">' + data.value + ' )</span>';
+
+				var parts = data.data.match(/id='([^']+)' type='([^']+)'/);			
+				node.display = '<span class="watch-object">Resource ( ' + parts[2] + '</span>, <span class="watch-object">#' + parts[1] + ' )</span>';
 				node.short = node.display;
 				break;
 
-				break;
-*/
 			case 'array':
 
 				var display = [];
@@ -290,21 +379,21 @@ Debugger.inspector = {
 					}
 	
 					if (j < data.total) {
-						display.push('<span class="watch-arraymore">' + (data.attributes.numchildren - j) + ' more&hellip;</span>');	
+						display.push('<span class="watch-arraymore">' + (data.attributes.numchildren - j) + ' more&hellip;</span>');
 					}
-	
+
 					node.display = '<span class="watch-array">{</span> ' + display.join(", ") + ' <span class="watch-array">}</span>';
 
 				} else {
 
 					for (var j = 0; j < node.children.length && j < 3; j++) {
-						display.push(node.children[j].short);					
+						display.push(node.children[j].short);
 					}
-	
-					if (j < data.total) {
+
+					if (j < data.children.length) {
 						display.push('<span class="watch-arraymore">' + (data.attributes.numchildren - j) + ' more&hellip;</span>');	
 					}
-	
+					
 					node.display = '<span class="watch-array">[</span> ' + display.join(", ") + ' <span class="watch-array">]</span>';
 				}
 
@@ -313,6 +402,23 @@ Debugger.inspector = {
 				break;
 
 			case 'object':
+
+				if (data.attributes.facet) {
+		
+					if (data.attributes.facet == 'protected') {
+						node.name = '<span class="watch-protected">' + node.name + '</span>';			
+					}
+		
+					if (data.attributes.facet == 'private') {
+						var parts;
+						if (parts = data.attributes.name.match(/\*([^\*]+)\*(.+)/)) {
+							data.attributes.definedClass = parts[1];
+							data.attributes.name = parts[2];
+							node.name = this.makeString(data.attributes.name + " (" + data.attributes.definedClass + ")");
+						}
+						node.name = '<span class="watch-private">' + node.name + '</span>';			
+					}
+				}
 
 				var classname = data.attributes.classname;
 
@@ -331,6 +437,11 @@ Debugger.inspector = {
 /*
 
 			case 'function':
+					
+				if (data.extension) {
+					node.name = '<span class="watch-extension">' + node.name + '</span>';	
+				}
+
 				node.name = '<span class="watch-key-function">' + node.name + '</span>';
 				if (!node.children.length) {
 					node.display = '<span class="watch-function describe" rel="function ' + data.name + '">function()</span>';
@@ -370,12 +481,30 @@ Debugger.inspector = {
 
 		for (var i = 0; i < data.children.length; i++) {
 			var n = data.children[i].attributes.name;
-			if (typeof n != 'number' || parseInt(n) != n) {
+			if (!this.isNumeric(n)) {
 				return true;
 			}
 		}
 		
 		return false;
+	},
+
+	isNumeric : function(n) {
+		return (typeof(n) === 'number' || typeof(n) === 'string') && n !== '' && !isNaN(n);
+	},
+
+	sortAssociative : function(a, b) {
+		return ((a.attributes.name == b.attributes.name) ? 0 : ((a.attributes.name > b.attributes.name) ? 1 : -1));
+	},
+	
+	sortArray : function(a, b) {
+		return ((a.attributes.name == b.attributes.name) ? 0 : ((parseInt(a.attributes.name) > parseInt(b.attributes.name)) ? 1 : -1));			
+	},
+	
+	encodeAttr : function(str) {
+		str = str.replace(/'/g, "\\'");
+		str = str.replace(/"/g, "\\\"");
+		return str;
 	}
 
 };

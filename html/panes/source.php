@@ -23,6 +23,50 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ?>
 <script src="http://d1n0x3qji82z53.cloudfront.net/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
 <style type="text/css">
+
+.ace-dreamweaver .ace_content {
+	font-family: "Courier New", Courier, monospace;
+}
+
+.ace-dreamweaver .ace_line .ace_support.ace_php_tag {
+	font-weight: bold;
+}
+
+.ace-dreamweaver .ace_line .ace_comment,
+.ace-dreamweaver .ace_line .ace_comment.ace_doc,
+.ace-dreamweaver .ace_line .ace_comment.ace_doc.ace_tag {
+    color: #FF9900;
+}
+
+.ace-dreamweaver .ace_line .ace_string {
+	color: #CC0000;
+}
+
+.ace-dreamweaver .ace_line .ace_support.ace_function {
+	color: #0000FF;
+}
+
+.ace-dreamweaver .ace_line .ace_constant.ace_language {
+	color: #552200;
+}
+
+.ace-dreamweaver .ace_line .ace_variable {
+	color: #000000;
+}
+
+.ace-dreamweaver .ace_line .ace_keyword.ace_operator {
+	color: #0000FF;
+}
+
+.ace-dreamweaver .ace_line .ace_constant.ace_numeric {
+	color: #FF0000;
+}
+
+.ace-dreamweaver .ace_gutter {
+	background-color: #0099CC;
+	color: #FFFFFF;
+}
+
 .ace_gutter-cell.ace_breakpoint {
     border-radius: 20px 0 0 20px;
     box-shadow: 0px 0px 10px 10px #990000 inset;
@@ -53,10 +97,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 			if (!breakpoints[row]) {
 				e.editor.session.setBreakpoint(row);
-				Debugger.setBreakpoint(row + 1);
+				Debugger.setBreakpoint(Debugger.state.file, row + 1);
 			} else {
-				e.editor.session.clearBreakpoint(row);
-				Debugger.clearBreakpoint(row + 1);
+				e.editor.session.clearBreakpoint(Debugger.state.file, row);
+				Debugger.clearBreakpoint(Debugger.state.file, row + 1);
 			}
 			e.stop();
 		});
@@ -73,9 +117,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 <div id="source-pane">
 
 	<div id="buttons-container">
-
 		<input id="source-file" type="text" value="" size="60" />
 
+		<input type="checkbox" id="break-enabled" />
 		<div id="buttons">
 			<span id="run-state">disconnected</span>
 			<button id="resume"    onclick="Debugger.command('run',       null, null, Debugger.handleRun,      true);" title="Resume Execution"><img src="/assets/img/icons/control.png"         alt="resume"    /></button>
@@ -121,7 +165,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 	$('#source-file').on("keyup", function(e) {
 		if (e.which == 13) {
-			Debugger.getSource();
+			Debugger.getSource($(this).val());
 		}
 	});
 	

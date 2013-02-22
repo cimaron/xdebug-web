@@ -49,7 +49,9 @@ class SocketServer
 		$this->config["ip"] = $bind_ip;
 		$this->config["port"] = $port;
 
-		$this->master_socket = socket_create(AF_INET, SOCK_STREAM, 0);
+		$this->master_socket = socket_create(AF_INET, SOCK_STREAM, 0);	
+		socket_set_option($this->master_socket, SOL_SOCKET, SO_REUSEADDR, 1);
+
 		socket_bind($this->master_socket,$this->config["ip"],$this->config["port"]) or die("Issue Binding");
 		socket_getsockname($this->master_socket,$bind_ip,$port);
 		socket_listen($this->master_socket);
@@ -122,7 +124,7 @@ class SocketServer
 		}
 
 		// Set up a blocking call to socket_select
-		if(socket_select($read,$write = NULL, $except = NULL, $tv_sec = 0, $tv_usec = 1000) < 1)
+		if(socket_select($read,$write = NULL, $except = NULL, $tv_sec = 0, $tv_usec = 100) < 1)
 		{
 		//	SocketServer::debug("Problem blocking socket_select?");
 			return true;
@@ -147,21 +149,21 @@ class SocketServer
 			}
 
 		}
-
+		//DBGpProxy::log("Read " . implode(",", $read));
 		// Handle Input
 		for($i = 0; $i < $this->max_clients; $i++) // for each client
 		{
 			if(isset($this->clients[$i]))
 			{
 				if(in_array($this->clients[$i]->socket, $read))
-				{
+				{//DBGpProxy::log((string)$this->clients[$i]->socket . " may have data");
 					$input = socket_read($this->clients[$i]->socket, $this->max_read);
-					if($input == null)
-					{
+					if (!$input)
+					{//DBGpProxy::log($this->clients[$i]->socket . " has no data");
 						$this->disconnect($i);
 					}
 					else
-					{
+					{//DBGpProxy::log($this->clients[$i]->socket . " has some data: " . $input);
 						SocketServer::debug("{$i}@{$this->clients[$i]->ip} --> {$input}");
 						$this->trigger_hooks("INPUT",$this->clients[$i],$input);
 					}

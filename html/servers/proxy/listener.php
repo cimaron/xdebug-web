@@ -21,9 +21,33 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 
-include dirname(__FILE__) . '/../../include/SocketServer.php';
-include dirname(__FILE__) . '/proxy.php';
+/**
+ * Listener Class
+ */
+class Listener {
 
-$proxy = new DBGpProxy('192.168.1.101', 9000);
-$proxy->run();
+	public $name = "";
+	public $callback = NULL;
+	public $client = NULL;
+	public $bound = array();
+
+	/**
+	 * Constructor
+	 *
+	 * @param   string   $name       Event name
+	 * @param   mixed    $callback   String or array of callback function
+	 * @param   array    $bound      Optional list of bound arguments appended to called arguments
+	 */
+	public function __construct($name, $callback, $client = NULL, $bound = array()) {
+		
+		$this->name = $name;
+		$this->client = $client;
+		$this->callback = $callback;
+		$this->bound = $bound;
+
+		if ($client) {
+			$this->bound = array_merge(array($client), $this->bound);
+		}
+	}
+}
 

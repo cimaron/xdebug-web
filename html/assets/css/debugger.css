@@ -119,6 +119,19 @@ button[disabled]:hover {
 	color: #666666;
 }
 
+#run-state.status-starting {
+	color: #009900;
+}
+
+#run-state.status-break {
+	color: #009900;
+}
+
+#run-state.status-stopped {
+	color: #990000;
+}
+
+
 #inspect-pane ul a img {
 	float: left;
 	margin-right: 4px;
@@ -172,11 +185,18 @@ button[disabled]:hover {
 	color: #000066;
 }
 
+#loading-indicator {
+	float: right;
+	height: 16px;
+	width: 16px;
+}
+
 .loading {
-	height: 40px;
-	background-image: url(../img/spinner.gif);
+	background-color: #FFFFFF;
+	background-image: url(/assets/img/spinner.gif);
 	background-repeat: no-repeat;
 	background-position: center center;
+	border-radius: 8px;
 }
 
 .watch {
@@ -238,7 +258,7 @@ button[disabled]:hover {
 }
 
 .watch-boolean {
-	color: #000033;
+	color: #000066;
 }
 
 .watch-string:before,
@@ -295,6 +315,16 @@ button[disabled]:hover {
 .watch-arraymore {
 	font-weight: bold;
 	color:#666666;
+}
+
+.watch-arraymore-load {
+	font-weight: bold;
+	color:#666666;
+	cursor: pointer;
+}
+
+.watch-arraymore-load:hover {
+	text-decoration: underline;
 }
 
 .watch-short-key {

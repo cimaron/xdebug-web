@@ -20,10 +20,46 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+/**
+ * Response class
+ */
+class Response {
 
-include dirname(__FILE__) . '/../../include/SocketServer.php';
-include dirname(__FILE__) . '/proxy.php';
+	/**
+	 * Constructor
+	 *
+	 * @param   string   $name   Response name
+	 * @param   mixed    $data   Response data
+	 */
+	public function __construct($name, $data) {
+		$this->name = $name;
+		$this->data = $data;
+	}
 
-$proxy = new DBGpProxy('192.168.1.101', 9000);
-$proxy->run();
+	/**
+	 * String representation
+	 */
+	public function __toString() {
+
+		$str = json_encode($this);
+		
+		return $str;
+	}
+
+	/**
+	 * Send response to client
+	 *
+	 * @param   SocketServerClient   $client   Client
+	 */
+	public function send($client) {
+		
+		$str = (string)$this;
+		
+		$result = @socket_write($client->socket, $str, strlen($str));
+
+		return $result;
+	}
+
+}
+
 
