@@ -19,9 +19,13 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-(function($) {
-		  
-Debugger.inspector = {	
+Inspector = (function($) {
+
+	function Inspector() {
+		
+	}
+
+Inspector.prototype = {	
 
 	uid : 0,
 
@@ -120,7 +124,7 @@ Debugger.inspector = {
 
 		if ($(el).hasClass('watch-reload')) {
 			var reload = $(el).data('reload');
-			Debugger.reload(reload.fullname, reload.name, reload.stack_depth, el);
+			//Debugger.reload(reload.fullname, reload.name, reload.stack_depth, el);
 			return;
 		}
 
@@ -184,7 +188,7 @@ Debugger.inspector = {
 			$('<span>')
 				.appendTo(span)
 				.addClass('watch-toggle')
-				.attr('onclick', "Debugger.inspector.toggleWatch(this);")
+				.attr('onclick', "debugger_ui.debugger.inspector.toggleWatch(this);")
 				;
 			//out += '<span class="watch-toggle" onclick="Debugger.inspector.toggleWatch(this);"></span>';
 		}
@@ -219,53 +223,74 @@ Debugger.inspector = {
 		//return out;
 	},
 
+	parseCData : function(node) {
+		var text = node.textContent;
+		text = text.trim();
+		var cdata = atob(text);		
+		return cdata;
+	},
+
 	makeString : function(str) {
 		return jQuery('<div />').text(str).html();
 	},
 
 	makeTree : function(data) {
 
+		var attrs = {}, attr;
+		for (var i = 0; i < data.attributes.length; i++) {
+			attr = data.attributes[i];
+			attrs[attr.name] = attr.value;
+		}
+
+		var value = data.textContent;
+		if (attrs.encoding && attrs.encoding == 'base64') {
+			var value = this.parseCData(data);
+		}
+
 		var node = {
+			source : data,
 			display : data,
-			short : data.value,
-			name : this.makeString(data.attributes.name),
-			fullname : data.attributes.fullname ? data.attributes.fullname : data.attributes.name,
+			short : value,
+			name : this.makeString(attrs.name),
+			fullname : attrs.fullname ? attrs.fullname : attrs.name,
 			children : []
 		};
 
 		if (this.isAssociativeArray(data)) {
-			data.children.sort(this.sortAssociative);
+			//data.children.sort(this.sortAssociative);
 		}
 
 		for (var i = 0; i < data.children.length; i++) {
+
 			var child = data.children[i];
 			
-			child.attributes.stack_depth = data.attributes.stack_depth;
+			child.attributes.stack_depth = attrs.stack_depth;
 
-			if (data.attributes.type == 'object' && child.attributes.name == 'CLASSNAME') {
+			if (attrs.type == 'object' && child.getAttribute('name') == 'CLASSNAME') {
 				data.children.splice(i, 1);
 				i--;
 				continue;
 			}
 
 			node.children[i] = this.makeTree(child);
-			if (data.attributes.type == 'array') {
+			if (attrs.type == 'array') {
 				node.children[i].name = '<span class="watch-key-array">' + node.children[i].name + '</span>';
 			}
 			
-			if (child.children.length == 0 && child.attributes.numchildren > 0) {
-				//max_depth exceeded
-				node.reload = {
-					fullname : data.attributes.fullname,
-					name : data.attributes.name,
-					stack_depth : data.attributes.stack_depth
-				};
-			}
-
 		}
 
-		if (data.children.length != 0 && data.attributes.numchildren > data.children.length) {
+		if (data.children.length == 0 && attrs.numchildren > 0) {
+			//max_depth exceeded
+			node.reload = {
+				fullname : attrs.fullname,
+				name : attrs.name,
+				stack_depth : attrs.stack_depth ? attrs.stack_depth : 0
+			};
+		}
+
+		if (data.children.length != 0 && attrs.numchildren > data.children.length) {
 			//max_children exceeded
+
 			var onclick = "Debugger.getMore('" + this.encodeAttr(node.fullname) + "', this);";				
 			node.children.push({
 				display : '<span class="watch-arraymore-load" rel="1" onclick="' + onclick + '">more&hellip;</span>',
@@ -278,28 +303,26 @@ Debugger.inspector = {
 
 
 		//get html by type
-		switch (data.attributes.type) {
+		switch (attrs.type) {
 
 			case 'null':
 			case 'uninitialized':
-				node.display = '<span class="watch-null">' + data.attributes.type + '</span>';
+				node.display = '<span class="watch-null">' + attrs.type + '</span>';
 				node.short = node.display;
 				break;
 
 			case 'bool':
-				node.display = '<span class="watch-boolean">' + (data.data ? 'true' : 'false') + '</span>';
+				node.display = '<span class="watch-boolean">' + (value == '0' ? 'false' : 'true') + '</span>';
 				node.short = node.display;
 				break;
 
 			case 'int':
 			case 'float':
 
-			var value = data.data;
-
-				if (data.data == 'INF') {
+				if (value == 'INF') {
 					value = Infinity;
 				}
-				if (data.data == 'NAN') {
+				if (value == 'NAN') {
 					value = NaN;
 				}
 
@@ -308,7 +331,7 @@ Debugger.inspector = {
 				break;
 
 			case 'string':
-				var value = this.makeString(data.data);
+				var value = this.makeString(value);
 				var full = '<span class="watch-string">' + value + '</span>';
 				var short_str;
 
@@ -332,11 +355,11 @@ Debugger.inspector = {
 				break;
 
 			case 'breakpoint':
-				node.name = data.attributes.breaktype;
+				node.name = attrs.breaktype;
 
 			case 'file':
-				var filename = data.attributes.filename;
-				var line = data.attributes.lineno;
+				var filename = attrs.filename;
+				var line = attrs.lineno;
 				var full = '<span class="watch-file">' + filename + ' (line ' + line + ')</span>';
 
 				var onclick = "Debugger.getSource('" + filename.replace(/("')/, '\\$1') + "', " + line + ");";
@@ -344,8 +367,8 @@ Debugger.inspector = {
 				
 				node.display = '<span class="watch-file" onclick="' + onclick + '">' + filename + ' (line ' + line + ')</span>';
 				node.short = node.display;
-				if (data.attributes.where) {
-					node.name = data.attributes.where;
+				if (attrs.where) {
+					node.name = attrs.where;
 				}
 				node.fullname = node.name;
 
@@ -363,7 +386,7 @@ Debugger.inspector = {
 
 			case 'resource':
 
-				var parts = data.data.match(/id='([^']+)' type='([^']+)'/);			
+				var parts = value.match(/id='([^']+)' type='([^']+)'/);			
 				node.display = '<span class="watch-object">Resource ( ' + parts[2] + '</span>, <span class="watch-object">#' + parts[1] + ' )</span>';
 				node.short = node.display;
 				break;
@@ -379,7 +402,7 @@ Debugger.inspector = {
 					}
 	
 					if (j < data.total) {
-						display.push('<span class="watch-arraymore">' + (data.attributes.numchildren - j) + ' more&hellip;</span>');
+						display.push('<span class="watch-arraymore">' + (attrs.numchildren - j) + ' more&hellip;</span>');
 					}
 
 					node.display = '<span class="watch-array">{</span> ' + display.join(", ") + ' <span class="watch-array">}</span>';
@@ -391,7 +414,7 @@ Debugger.inspector = {
 					}
 
 					if (j < data.children.length) {
-						display.push('<span class="watch-arraymore">' + (data.attributes.numchildren - j) + ' more&hellip;</span>');	
+						display.push('<span class="watch-arraymore">' + (attrs.numchildren - j) + ' more&hellip;</span>');	
 					}
 					
 					node.display = '<span class="watch-array">[</span> ' + display.join(", ") + ' <span class="watch-array">]</span>';
@@ -403,24 +426,24 @@ Debugger.inspector = {
 
 			case 'object':
 
-				if (data.attributes.facet) {
+				if (attrs.facet) {
 		
-					if (data.attributes.facet == 'protected') {
+					if (attrs.facet == 'protected') {
 						node.name = '<span class="watch-protected">' + node.name + '</span>';			
 					}
 		
-					if (data.attributes.facet == 'private') {
+					if (attrs.facet == 'private') {
 						var parts;
-						if (parts = data.attributes.name.match(/\*([^\*]+)\*(.+)/)) {
-							data.attributes.definedClass = parts[1];
-							data.attributes.name = parts[2];
-							node.name = this.makeString(data.attributes.name + " (" + data.attributes.definedClass + ")");
+						if (parts = attrs.name.match(/\*([^\*]+)\*(.+)/)) {
+							attrs.definedClass = parts[1];
+							attrs.name = parts[2];
+							node.name = this.makeString(attrs.name + " (" + attrs.definedClass + ")");
 						}
 						node.name = '<span class="watch-private">' + node.name + '</span>';			
 					}
 				}
 
-				var classname = data.attributes.classname;
+				var classname = attrs.classname;
 
 				var display = [];
 				for (var j = 0; j < node.children.length && j < 3; j++) {
@@ -466,7 +489,7 @@ Debugger.inspector = {
 				node.display = data.value;
 */
 			default:
-				node.display = data.attributes.type;
+				node.display = attrs.type;
 				node.short = node.display;
 				break;
 		}
@@ -479,8 +502,12 @@ Debugger.inspector = {
 	 */
 	isAssociativeArray : function(data) {
 
+		if (data.getAttribute('type') != 'array') {
+			return;	
+		}
+
 		for (var i = 0; i < data.children.length; i++) {
-			var n = data.children[i].attributes.name;
+			var n = data.children[i].getAttribute('name');
 			if (!this.isNumeric(n)) {
 				return true;
 			}
@@ -494,11 +521,11 @@ Debugger.inspector = {
 	},
 
 	sortAssociative : function(a, b) {
-		return ((a.attributes.name == b.attributes.name) ? 0 : ((a.attributes.name > b.attributes.name) ? 1 : -1));
+		return a.getAttribute('name').localeCompare(b.getAttribute('name'));
 	},
 	
 	sortArray : function(a, b) {
-		return ((a.attributes.name == b.attributes.name) ? 0 : ((parseInt(a.attributes.name) > parseInt(b.attributes.name)) ? 1 : -1));			
+		return ((a.getAttribute('name') == b.getAttribute('name')) ? 0 : (parseInt(a.getAttribute('name')) > parseInt(b.getAttribute('name')) ? 1 : -1));			
 	},
 	
 	encodeAttr : function(str) {
@@ -508,6 +535,8 @@ Debugger.inspector = {
 	}
 
 };
-		  
+ 
+ return Inspector;
+ 
 }(jQuery));
 

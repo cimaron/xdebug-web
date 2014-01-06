@@ -67,15 +67,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	<div id="files-container"></div>
 </div>
 
-<script type="text/javascript" src="assets/js/jquery.jstree.js"></script>
-<script type="text/javascript" src="assets/js/jquery.hotkeys.js"></script>
+<script type="text/javascript" src="<? echo $basedir; ?>/assets/js/jquery.jstree.js"></script>
+<script type="text/javascript" src="<? echo $basedir; ?>/assets/js/jquery.hotkeys.js"></script>
 <script type="text/javascript">
-
+/*
 (function($) {
 
 	function resize() {
 		//console.log('resize');
-		/*
+		/ *
 		var pane = $('#files-pane');
 		var cont = $('#files-container');
 
@@ -83,7 +83,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 		var newheight =  pane.height() - (cont.offset().top - pane.offset().top);
 		cont.height(newheight);
-		*/
+		* /
 	}
 
 	WindowLayout.options.west.onresize = function() {
@@ -175,11 +175,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			}
 		})
 		
-		/*.bind("select_node.jstree", function (event, data) { 
+		/ *.bind("select_node.jstree", function (event, data) { 
 			console.log(data);
-		})*/;  
+		})* /;  
 
 	};
 	
 }(jQuery));
+*/
 </script>

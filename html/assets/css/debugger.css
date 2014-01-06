@@ -147,6 +147,11 @@ button[disabled]:hover {
 
 #console-container {
 	overflow: auto;
+	font-family: "Courier New", Courier, monospace;
+	font-size: 12px;
+}
+#console-container td {
+	white-space: pre;
 }
 
 #console-container > div {
@@ -172,15 +177,16 @@ button[disabled]:hover {
 	border-bottom: solid 1px #CCCCCC;
 }
 
-#debug .key {
+#debug .key, .debug .key {
 	background-color: #333333;
 	color: #FFFFFF;
 	font-weight: bold;
 	width: 0;
 	padding-right: 10px;
+	vertical-align: top;
 }
 
-#debug .value {
+#debug .value, .debug .value {
 	padding-left: 10px;
 	color: #000066;
 }
@@ -204,28 +210,28 @@ button[disabled]:hover {
 	color: #000000;
 }
 
-.watch tr {
+.watch_row {
 	border-bottom: solid 1px #F6F6F6;
 }
 
-.watch tr.watch-top {
+.watch_row.watch-top {
 	border: solid 1px #CCCCCC;
 	border-width: 1px 0 1px 0;
 	background-color: #F6F6F6;
 }
 
-.watch tr > td:first-child {
+.watch_row > td:first-child {
 	padding: 0 10px 0 10px;
 	white-space: nowrap;
 	vertical-align: top;
 }
 
-.watch tr > td:nth-child(2) {
+.watch_row > td:nth-child(2) {
 	width: 100%;
 	padding-left: 10px;
 }
 
-.watch tr > td:first-child > span {
+.watch_row > td:first-child > span {
 	position: relative;
 	padding-left: 17px;
 }

@@ -74,7 +74,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 }
 </style>
 <script>
-	jQuery().ready(function() {
+(function($) {
+
+	var editor;
+
+	$().ready(function() {
+
 		editor = ace.edit("src");
 		editor.setTheme("ace/theme/dreamweaver");
 		editor.getSession().setMode("ace/mode/php");
@@ -90,11 +95,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			if (e.clientX > 25 + target.getBoundingClientRect().left) {
 				return;
 			}
-
+	
 			var row = e.getDocumentPosition().row;
-
+	
 			var breakpoints = e.editor.session.getBreakpoints();
-
+	
 			if (!breakpoints[row]) {
 				e.editor.session.setBreakpoint(row);
 				Debugger.setBreakpoint(Debugger.state.file, row + 1);
@@ -105,40 +110,55 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			e.stop();
 		});
 
+		var curline = 0;
+
+		debugger_ui.debugger.bind('onDebuggerFile', function(e) {
+			$('#source-file').html($('<option>').text(e.file));
+		});
+
+		debugger_ui.debugger.bind('onDebuggerSource', function(e) {
+			editor.setValue(e.source);
+			editor.setReadOnly(true);
+			editor.clearSelection();
+
+			editor.gotoLine(curline, 0);
+			editor.scrollToLine(curline, true);
+
+			//debugger_ui.debugger.displayBreakpoints();
+		});
+
+		debugger_ui.debugger.bind('onDebuggerLineno', function(e) {
+			editor.gotoLine(e.line, 0);
+			editor.scrollToLine(e.line, true);
+			curline = e.line;		
+		});
+
+		['onProxyStatus', 'onDebuggerStatus'].forEach(function(name, i) {
+			debugger_ui.debugger.bind(name, function(e) {
+				$('#run-state')
+					.text(e.status)
+					.removeClass()
+					.addClass('status-' + e.status)
+					;
+			});
+		});
+		
+		debugger_ui.debugger.bind('onRawData', function() {
+		});
+		debugger_ui.debugger.bind('onSendProxyCommand', function() {
+		});
+		
+
 		/*
 		//doesn't give us info on what breakpoint changed
 		editor.session.on('changeBreakpoint', function(e) {
 		});
 		*/
 
+		$('#buttons').buttonset();
+		resize();	
 	});
-</script>
 
-<div id="source-pane">
-
-	<div id="buttons-container">
-		<input id="source-file" type="text" value="" size="60" />
-
-		<input type="checkbox" id="break-enabled" />
-		<div id="buttons">
-			<span id="run-state">disconnected</span>
-			<button id="resume"    onclick="Debugger.command('run',       null, null, Debugger.handleRun,      true);" title="Resume Execution"><img src="/assets/img/icons/control.png"         alt="resume"    /></button>
-			<button id="stop"      onclick="Debugger.command('stop',      null, null, null,                    true);" title="Stop Execution"  ><img src="/assets/img/icons/cross-script.png"    alt="stop"      /></button>
-			<button id="step_over" onclick="Debugger.command('step_over', null, null, Debugger.handleStepOver      );" title="Step Over"       ><img src="/assets/img/icons/arrow-step-over.png" alt="step over" /></button>
-			<button id="step_into" onclick="Debugger.command('step_into', null, null, Debugger.handleStepInto      );" title="Step Into"       ><img src="/assets/img/icons/arrow-step.png"      alt="step into" /></button>
-			<button id="step_out" onclick="Debugger.command('step_out', null, null, Debugger.handleStepOut         );" title="Step Out"        ><img src="/assets/img/icons/arrow-step-out.png"  alt="step out"  /></button>
-		</div>
-	</div>
-
-	<div id="source-container">
-		<div id="src"></div>
-	</div>
-
-</div>
-
-<script type="text/javascript">
-
-(function($) {
 
 	function resize() {
 	
@@ -158,16 +178,35 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		return true;
 	};
 
-	$().ready(function() {
-		$('#buttons').buttonset();
-		resize();
-	});
-
 	$('#source-file').on("keyup", function(e) {
 		if (e.which == 13) {
 			Debugger.getSource($(this).val());
 		}
 	});
 	
+	
 }(jQuery));
 </script>
+
+<div id="source-pane">
+
+	<div id="buttons-container">
+		<select id="source-file" style="width:50%;"></select>
+
+		<input type="checkbox" id="break-enabled" />
+		<div id="buttons">
+			<span id="run-state">initializing</span>
+			<button id="resume"    onclick="debugger_ui.debugger.dbgRun();" title="Resume Execution"><img src="/assets/img/icons/control.png" alt="resume" /></button>
+			<button id="stop"      onclick="debugger_ui.debugger.dbgStop();" title="Stop Execution"><img src="/assets/img/icons/cross-script.png" alt="stop" /></button>
+			<button id="step_over" onclick="debugger_ui.debugger.dbgStepOver();" title="Step Over"><img src="/assets/img/icons/arrow-step-over.png" alt="step over" /></button>
+			<button id="step_into" onclick="debugger_ui.debugger.dbgStepInto();" title="Step Into"><img src="/assets/img/icons/arrow-step.png" alt="step into" /></button>
+			<button id="step_out" onclick="debugger_ui.debugger.dbgStepOut();" title="Step Out"><img src="/assets/img/icons/arrow-step-out.png" alt="step out"  /></button>
+		</div>
+	</div>
+
+	<div id="source-container">
+		<div id="src"></div>
+	</div>
+
+</div>
+

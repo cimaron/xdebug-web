@@ -24,19 +24,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 <div id="console-pane">
 
 	<div id="toolbar" class="ui-widget-header ui-corner-all">
-		<button id="console-button-clear" onClick="Debugger.clear_console();"><img src="/assets/img/icons/cross-script.png" alt="clear" /></button>
+		<button id="console-button-clear" onClick="debugger_ui.trigger('onClearConsole');"><img src="/assets/img/icons/cross-script.png" alt="clear" /></button>
 
 		<input type="checkbox" name="console-checkbox-persist" id="console-checkbox-persist" />
 		<label for="console-checkbox-persist" />Persist
 	</div>
-	
+
 	<div id="console-container">
+		<table class="debug"></table>
 	</div>
 </div>
 
 <script type="text/javascript">
 
 (function($) {
+
+	var log;
 
 	function resize() {
 		var pane = $('#console-pane');
@@ -49,20 +52,43 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		con.height(newheight);
 	}
 
+	function onLog(key, value) {
+
+		value += '';
+		var chunks = [], pos = 0, len = value.length;
+		while (pos < len) {
+			chunks.push(value.slice(pos, pos += 80));
+		}
+		
+		args = "<tr><td class=\"key\">" + key + "</td><td class=\"value\">" + chunks.join("<br />") + "</td></tr>";
+		
+		log.find('table').append(args);
+		
+		log.scrollTop(log.scrollTop());
+	}
+	
 	WindowLayout.options.center.childOptions.south.childOptions.center.onresize = function() {
 		resize();
 		return true;
 	};
 
+
 	$().ready(function() {
+	
+		log = $('#console-container');
+	
 		$('#console-pane .button').button();
 		$('#console-checkbox-persist').button();
 		resize();
-	});
 
-	Debugger.clear_console = function() {
-		$('#console-container').html('');
-	}
+		debugger_ui.bind('onLog', onLog);
+		debugger_ui.debugger.bind('onLog', onLog);
+
+		debugger_ui.bind('onClearConsole', function() {
+			log.html('');	
+		});
+
+	});
 
 }(jQuery));
 </script>

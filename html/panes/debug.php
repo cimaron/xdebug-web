@@ -28,22 +28,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	
 	<ul>
 		<li rel="local">
-			<a href="#inspect-local"><img src="assets/img/icons/application-tree.png" alt="list" /> Local</span></a>
+			<a href="#inspect-local"><img src="<? echo $basedir; ?>/assets/img/icons/application-tree.png" alt="list" /> Local</a>
 		</li>
 		<li rel="watch">
-			<a href="#inspect-watch-container"><img src="assets/img/icons/eye.png" alt="eye" /> Watch</a>
+			<a href="#inspect-watch-container"><img src="<? echo $basedir; ?>/assets/img/icons/eye.png" alt="eye" /> Watch</a>
 		</li>
 		<li rel="global">
-			<a href="#inspect-global"><img src="assets/img/icons/script-globe.png" alt="script globe" /> Global</a>
+			<a href="#inspect-global"><img src="<? echo $basedir; ?>/assets/img/icons/script-globe.png" alt="script globe" /> Global</a>
 		</li>
 		<li rel="defines">
-			<a href="#inspect-defines"><img src="assets/img/icons/application-list.png" alt="list" /> Defines</a>
+			<a href="#inspect-defines"><img src="<? echo $basedir; ?>/assets/img/icons/application-list.png" alt="list" /> Defines</a>
 		</li>
 		<li rel="stack">
-			<a href="#inspect-stack"><img src="assets/img/icons/applications-stack.png" alt="app stack" /> Stack</a>
+			<a href="#inspect-stack"><img src="<? echo $basedir; ?>/assets/img/icons/applications-stack.png" alt="app stack" /> Stack</a>
 		</li>
 		<li rel="breakpoints">
-			<a href="#inspect-breakpoints"><img src="assets/img/icons/breakpoint.png" alt="breakpoints" /> Breakpoints</a>
+			<a href="#inspect-breakpoints"><img src="<? echo $basedir; ?>/assets/img/icons/breakpoint.png" alt="breakpoints" /> Breakpoints</a>
 		</li>
 	</ul>
 
@@ -101,6 +101,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		});
 
 	});
+
+	debugger_ui.debugger.bind('onProxyStart', function() {
+		this.displayStatus('waiting for connections');
+		$('#loading-indicator').removeClass('loading');
+	});
+
+	debugger_ui.debugger.bind('onProxyDisconnect', function() {				
+		this.displayStatus('not listening');
+		$('#loading-indicator').removeClass('loading');
+	});
+
+
 
 }(jQuery));
 </script>
