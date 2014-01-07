@@ -122,7 +122,9 @@ Inspector.prototype = {
 		var child_class = el.id + '_child';
 		var children = $('.' + child_class);
 
-		children.each($.proxy(function(i, el) { this.toggleChild(i, el, state);}, this));
+		children.each(function(i, el) {
+			this.toggleChild(i, el, state);
+		}.bind(this));
 	},
 
 	/**
@@ -132,7 +134,19 @@ Inspector.prototype = {
 
 		if ($(el).hasClass('watch-reload')) {
 			var reload = $(el).data('reload');
-			//Debugger.reload(reload.fullname, reload.name, reload.stack_depth, el);
+			debugger_ui.debugger.dbgPropertyGet(reload.fullname, reload.stack_depth).then(function(response) {
+																								   
+				var data = response.data;
+				var node = data.children[0];
+				
+				node.setAttribute('fullname', reload.name);
+				node.setAttribute('name', reload.name);
+				node.setAttribute('stack_depth', reload.stack_depth);
+
+				var row = $(el).closest('tr');
+				debugger_ui.debugger.injectInspectPane(node, row, 'after');
+				row.remove();				
+			});
 			return;
 		}
 

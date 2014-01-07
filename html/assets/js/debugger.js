@@ -484,6 +484,23 @@ Debugger.prototype = {
 	},
 
 	/**
+	 * Send debugger property_get command
+	 *
+	 * @param   mixed    success   Success callback (optional)
+	 * @param   mixed    failure   Failure callback (optional)
+	 *
+	 * @return  promise
+	 */
+	dbgPropertyGet : function(fullname, stack_depth, success, failure) {
+		return this.sendDebuggerCommand('property_get', {
+				n : fullname,
+				d : stack_depth
+			})
+			.then(success, failure)
+			;
+	},
+
+	/**
 	 * Send debugger run command
 	 *
 	 * @param   mixed    success   Success callback (optional)
@@ -971,26 +988,6 @@ Debugger.prototype = {
 	},
 
 	/**
-	 * Handle property_get for reload
-	 * 
-	 * @param   object   res     Response
-	 * @param   object   trans   Transaction	 
-	 */
-	handleReload : function(res, trans) {
-
-		var options = trans.options;
-		var data = res.children[0];
-
-		data.attributes.fullname = options.name;
-		data.attributes.name = options.name;
-		data.attributes.stack_depth = options.stack_depth;
-
-		var row = $(options.element).closest('tr');
-		this.injectInspectPane(data, row, 'after');
-		row.remove();
-	},
-
-	/**
 	 * Parse file string
 	 */
 	parseFile : function(file) {
@@ -1185,10 +1182,6 @@ Debugger.prototype = {
 		var page = parseInt($(element).attr('rel'));
 		this.command('property_get', {n : name, p : page}, null, Debugger.handleMore, false, {element : element, page : page, fullname : name});	
 	},
-
-	reload : function(fullname, name, stack_depth, element) {
-		this.command('property_get', {n : fullname, d : stack_depth}, null, Debugger.handleReload, false, {element : element, fullname : fullname, name : name, stack_depth : stack_depth});	
-	}
 
 };
 
