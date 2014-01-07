@@ -562,6 +562,21 @@ Debugger.prototype = {
 	},
 
 	/**
+	 * Send debugger step_out command
+	 *
+	 * @param   mixed    success   Success callback (optional)
+	 * @param   mixed    failure   Failure callback (optional)
+	 *
+	 * @return  promise
+	 */
+	dbgStepOut : function(success, failure) {
+		return this.sendDebuggerCommand('step_out')
+			.then(this.handleStatus.bind(this))
+			.then(success, failure)
+			;
+	},
+
+	/**
 	 * Send debugger step_over command
 	 *
 	 * @param   mixed    success   Success callback (optional)
