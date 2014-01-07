@@ -23,11 +23,14 @@ Inspector = (function($) {
 
 	function Inspector() {
 		
+		this.state = {
+			open : {}
+		};
+
+		this.uid = 0;
 	}
 
 Inspector.prototype = {	
-
-	uid : 0,
 
 	action_log : function(data) {
 
@@ -92,9 +95,14 @@ Inspector.prototype = {
 		if (state) {
 			$(button).addClass('watch-toggle-open');
 			$(el).removeClass('inactive').addClass('active');
+			
+			this.state.open[$(el).data('path')] = true;
+			
 		} else {
 			$(button).removeClass('watch-toggle-open');
 			$(el).removeClass('active').addClass('inactive');			
+
+			delete this.state.open[$(el).data('path')];
 		}
 
 		reload = $(el).find('.describe')[0];
@@ -141,11 +149,12 @@ Inspector.prototype = {
 		}		
 	},
 
-	treeHtml : function(tree, depth, parentid) {
+	treeHtml : function(tree, depth, parentid, parent_open) {
 		//var out = "";
 		var uid = this.uid++;
 
 		var indent = depth * 20  + 10;
+		var open = this.state.open[tree.fullname];
 
 		var tr = $('<tr>')
 			.addClass('watch_row')
@@ -155,6 +164,7 @@ Inspector.prototype = {
 			.data('uid', uid)
 			.data('depth', depth)
 			.data('parentid', parentid)
+			.data('path', tree.fullname)
 			;
 
 		if (tree.reload) {
@@ -163,15 +173,12 @@ Inspector.prototype = {
 		}
 
 		if (depth == 0) {
-			tr.addClass('watch-top');
-			
-			//out += '<tr class="watch_row watch_row_' + uid + ' watch-top inactive" id="watch_row_' + uid + '">';
+			tr.addClass('watch-top');			
 		} else {
-			tr.addClass('watch_row_' + parentid + '_child')
-				.css('display', 'none')
-				;
-
-			//out += '<tr class="watch_row watch_row_' + uid + ' watch_row_' + parentid + '_child inactive" id="watch_row_' + uid + '" style="display:none">';
+			tr.addClass('watch_row_' + parentid + '_child');
+			if (!parent_open) {
+				tr.css('display', 'none');
+			}
 		}
 
 		var td = $('<td>')
@@ -182,15 +189,19 @@ Inspector.prototype = {
 		var span = $('<span>')
 			.appendTo(td)
 			;
-		//out += '<td style="padding-left:' + indent + 'px;"><span>';
 
 		if (tree.children.length) {
-			$('<span>')
-				.appendTo(span)
+			
+			var toggle = $('<span>')
 				.addClass('watch-toggle')
 				.attr('onclick', "debugger_ui.debugger.inspector.toggleWatch(this);")
 				;
-			//out += '<span class="watch-toggle" onclick="Debugger.inspector.toggleWatch(this);"></span>';
+			
+			if (open) {
+				toggle.addClass('watch-toggle-open');
+			}
+
+			toggle.appendTo(span);
 		}
 
 		span = $('<span>')
@@ -198,25 +209,16 @@ Inspector.prototype = {
 			.addClass('watch-name')
 			.html(depth == 0 ? tree.fullname : tree.name)
 			;
-		//out += '<span><span class="watch-name">' + (depth == 0 ? tree.fullname : tree.name) + '</span></span></td>';
 		
 		td = $('<td>')
 			.appendTo(tr)
 			.html(tree.display)
 			;
-		//out += '<td>' + tree.display + '</td>';
 		
-		if (depth == 0) {
-			//out += '<td class="watch-close"><span>&times;</span></td>';	
-		}
-		
-		//out += '</tr>';
-
 		var list = [tr];
 
 		for (var i = 0; i < tree.children.length; i++) {
-			list = list.concat(this.treeHtml(tree.children[i], depth + 1, uid));
-			//out += this.treeHtml(tree.children[i], depth + 1, uid);
+			list = list.concat(this.treeHtml(tree.children[i], depth + 1, uid, open));
 		}
 
 		return list;
