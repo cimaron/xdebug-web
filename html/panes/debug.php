@@ -24,8 +24,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 <div id="inspect-pane" class="tabs">
 
-	<div id="loading-indicator" class="loading"></div>
-	
 	<ul>
 		<li rel="local">
 			<a href="#inspect-local"><img src="<? echo $basedir; ?>/assets/img/icons/application-tree.png" alt="list" /> Local</a>

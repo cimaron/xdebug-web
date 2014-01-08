@@ -300,6 +300,8 @@ Debugger.prototype = {
 
 		var promise = this.sendProxyCommand('debug', command, success, failure, trans, {args : args, data : data});
 
+		this.trigger('onDebuggerStatus', [{instance : null, status : 'running'}]);
+
 		return promise;
 	},
 

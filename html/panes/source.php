@@ -135,11 +135,33 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 		['onProxyStatus', 'onDebuggerStatus'].forEach(function(name, i) {
 			debugger_ui.debugger.bind(name, function(e) {
-				$('#run-state')
-					.text(e.status)
-					.removeClass()
-					.addClass('status-' + e.status)
-					;
+			
+				var el = (i == 0 ? $('#proxy-status') : $('#debugger-status'));
+				['stopped', 'waiting', 'started'].forEach(function(status) {
+					el.removeClass('indicator-' + status);
+				});
+
+				switch (e.status) {
+					case 'connected':
+					case 'starting':
+					case 'connecting':
+					case 'running':
+						el.addClass('indicator-started');
+						break;
+
+					case 'break':
+					case 'waiting':
+						el.addClass('indicator-waiting');
+						break;
+					
+					case 'stopping':
+					case 'disconnected':
+						el.addClass('indicator-stopped');
+						break;						
+					
+					default:
+						console.log(e.status);
+				}
 			});
 		});
 		
@@ -195,7 +217,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 		<input type="checkbox" id="break-enabled" />
 		<div id="buttons">
-			<span id="run-state">initializing</span>
+			<span id="proxy-status" class="indicator indicator-stopped"></span>
+			<span id="debugger-status" class="indicator indicator-stopped"></span>
 			<button id="resume"    onclick="debugger_ui.debugger.dbgRun();" title="Resume Execution"><img src="/assets/img/icons/control.png" alt="resume" /></button>
 			<button id="stop"      onclick="debugger_ui.debugger.dbgStop();" title="Stop Execution"><img src="/assets/img/icons/cross-script.png" alt="stop" /></button>
 			<button id="step_over" onclick="debugger_ui.debugger.dbgStepOver();" title="Step Over"><img src="/assets/img/icons/arrow-step-over.png" alt="step over" /></button>
