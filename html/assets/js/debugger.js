@@ -384,9 +384,11 @@ Debugger.prototype = {
 
 		this.trigger('onDebuggerStatus', [{instance : instance, status : 'connected'}]);
 
+		this.dbgFeatureSet('max_children', 50);
+
 		this.dbgStatus();
 		this.dbgSource(instance.fileuri);
-
+		
 		return;
 
 		this.displayFile(this.state.file);
@@ -481,6 +483,23 @@ Debugger.prototype = {
 	 */
 	dbgEval : function(cmd, success, failure) {
 		return this.sendDebuggerCommand('eval', null, cmd)
+			.then(success, failure)
+			;
+	},
+
+	/**
+	 * Send debugger feature_set command
+	 *
+	 * @param   string   name      Name
+	 * @param   string   value     Value
+	 * @param   mixed    success   Success callback (optional)
+	 * @param   mixed    failure   Failure callback (optional)
+	 *
+	 * @return  promise
+	 */
+	dbgFeatureSet : function(name, value, success, failure) {
+		return this.sendDebuggerCommand('feature_set', {n : name, v : value})
+			.then(this.handleFeatureSet.bind(this))
 			.then(success, failure)
 			;
 	},
@@ -629,6 +648,32 @@ Debugger.prototype = {
 		this.updateInspectPane(null, this.options.elements.watch);
 		*/
 		
+		return response;
+	},
+
+	/**
+	 * Handle debugger feature_set response packet
+	 *
+	 * @param   object   response   Object with debugger instance and response data
+	 */	
+	handleFeatureSet : function(response) {
+
+		var instance = response.instance;
+		var data = response.data;
+
+		var name = response.extra.args.n;
+		var value = response.extra.args.v;
+
+		instance.features[name] = value;
+
+		this.log('debugger:feature_set', name + ':' + value);
+
+		this.trigger('onFeatureSet', [{
+			instance : instance,
+			name : name,
+			value : value
+		}]);
+
 		return response;
 	},
 
