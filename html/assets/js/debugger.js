@@ -209,7 +209,8 @@ Debugger.prototype = {
 					if (packet.resolve) {
 						packet.resolve({
 							instance : this.instances[response.appid],
-							data : data
+							data : data,
+							extra : packet.extra
 						});
 					}
 					delete this.requests[trans];
@@ -239,7 +240,7 @@ Debugger.prototype = {
 	 *
 	 * @return  promise
 	 */
-	sendProxyCommand : function(command, args, success, failure, trans) {
+	sendProxyCommand : function(command, args, success, failure, trans, extra) {
 
 		if (!this.connected) {
 			return false;	
@@ -252,7 +253,8 @@ Debugger.prototype = {
 		var packet = {
 			method : command,
 			data : args,
-			trans : trans
+			trans : trans,
+			extra : extra
 		};
 
 		this.socket.send(packet);
@@ -296,7 +298,7 @@ Debugger.prototype = {
 
 		this.log('debugger:send', command);
 
-		var promise = this.sendProxyCommand('debug', command, success, failure, trans);
+		var promise = this.sendProxyCommand('debug', command, success, failure, trans, {args : args, data : data});
 
 		return promise;
 	},
