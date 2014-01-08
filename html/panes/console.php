@@ -62,8 +62,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		
 		args = "<tr><td class=\"key\">" + key + "</td><td class=\"value\">" + chunks.join("<br />") + "</td></tr>";
 		
-		log.find('table').append(args);
+		var table = log.find('table');
 		
+		table.append(args);
+		var l = table.find('tr').length
+
+		table.find('tr:lt(' + (l - 20) + ')').remove();		
+
 		log.scrollTop(log.scrollTop());
 	}
 	
