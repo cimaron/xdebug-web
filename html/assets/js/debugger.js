@@ -219,7 +219,7 @@ Debugger.prototype = {
 				break;
 		}
 
-		this.trigger('onRawData', [{response, response}]);
+		this.trigger('onRawData', [{response : response}]);
 	},
 
 	/**
