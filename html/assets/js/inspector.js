@@ -239,11 +239,13 @@ Inspector.prototype = {
 		//return out;
 	},
 
-	parseCData : function(node) {
+	parseText : function(node, decode) {
 		var text = node.textContent;
 		text = text.trim();
-		var cdata = atob(text);		
-		return cdata;
+		if (decode) {
+			text = atob(text);
+		}
+		return text;
 	},
 
 	makeString : function(str) {
@@ -258,10 +260,7 @@ Inspector.prototype = {
 			attrs[attr.name] = attr.value;
 		}
 
-		var value = data.textContent;
-		if (attrs.encoding && attrs.encoding == 'base64') {
-			var value = this.parseCData(data);
-		}
+		value = this.parseText(data, (attrs.encoding && attrs.encoding == 'base64'));
 
 		var node = {
 			source : data,
