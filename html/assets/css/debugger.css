@@ -127,11 +127,11 @@ button[disabled]:hover {
 	background-color: #FF0000;	
 }
 
-.indicator-waiting {
+.indicator-running {
 	background-color: #00FF00;	
 }
 
-.indicator-started {
+.indicator-paused {
 	background-color: #FFFF00;
 }
 

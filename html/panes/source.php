@@ -135,25 +135,25 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 		['onProxyStatus', 'onDebuggerStatus'].forEach(function(name, i) {
 			debugger_ui.debugger.bind(name, function(e) {
-			
+
 				var el = (i == 0 ? $('#proxy-status') : $('#debugger-status'));
-				['stopped', 'waiting', 'started'].forEach(function(status) {
+				['stopped', 'paused', 'running'].forEach(function(status) {
 					el.removeClass('indicator-' + status);
 				});
 
 				switch (e.status) {
 					case 'connected':
-					case 'starting':
 					case 'connecting':
 					case 'running':
-						el.addClass('indicator-started');
+						el.addClass('indicator-running');
 						break;
 
+					case 'starting':
 					case 'break':
 					case 'waiting':
-						el.addClass('indicator-waiting');
+						el.addClass('indicator-paused');
 						break;
-					
+
 					case 'stopping':
 					case 'disconnected':
 						el.addClass('indicator-stopped');

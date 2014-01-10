@@ -139,7 +139,7 @@ Debugger.prototype = {
 
 		this.connected = true;
 
-		this.trigger('onProxyStatus', [{status : 'waiting'}]);
+		this.trigger('onProxyStatus', [{status : 'connected'}]);
 
 		this.proxySetName('cimaron').then(function(response) {
 			this.log('proxy:setName', response.data);
@@ -304,8 +304,6 @@ Debugger.prototype = {
 
 		var promise = this.sendProxyCommand('debug', command, success, failure, trans, {args : args, data : data});
 
-		this.trigger('onDebuggerStatus', [{instance : null, status : 'running'}]);
-
 		return promise;
 	},
 
@@ -432,9 +430,7 @@ Debugger.prototype = {
 		var instance = this.instances[appid];
 		delete this.instances[appid];
 
-
 		this.trigger('onDebuggerStatus', [{instance : instance, status : 'disconnected'}]);
-		this.trigger('onProxyStatus', [{status : 'waiting'}]);
 	},
 
 	/**
@@ -536,6 +532,9 @@ Debugger.prototype = {
 	 * @return  promise
 	 */
 	dbgRun : function(success, failure) {
+
+		this.trigger('onDebuggerStatus', [{instance : null, status : 'running'}]);
+
 		return this.sendDebuggerCommand('run')
 			.then(this.handleStatus.bind(this))
 			.then(success, failure)
@@ -582,6 +581,9 @@ Debugger.prototype = {
 	 * @return  promise
 	 */
 	dbgStepInto : function(success, failure) {
+
+		this.trigger('onDebuggerStatus', [{instance : null, status : 'running'}]);
+
 		return this.sendDebuggerCommand('step_into')
 			.then(this.handleStatus.bind(this))
 			.then(success, failure)
@@ -597,6 +599,9 @@ Debugger.prototype = {
 	 * @return  promise
 	 */
 	dbgStepOut : function(success, failure) {
+
+		this.trigger('onDebuggerStatus', [{instance : null, status : 'running'}]);
+
 		return this.sendDebuggerCommand('step_out')
 			.then(this.handleStatus.bind(this))
 			.then(success, failure)
