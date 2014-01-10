@@ -472,7 +472,7 @@ var Commands = {
 
 		} else {
 
-			var response = new ProxyPacket('debug', false, null, message);
+			var response = new ProxyPacket('error', false, null, {error : 'Not connected'});
 			ide.send(response.toString());
 		}		
 	},

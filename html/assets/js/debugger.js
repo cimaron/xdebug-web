@@ -184,7 +184,11 @@ Debugger.prototype = {
 		this.log('proxy:rawdata', data);
 
 		switch (response.type) {
-			
+
+			case 'error':
+				packet.reject(data);
+				break;
+
 			case 'connect':
 				this.handleDebuggerConnected(response.appid, data);
 				break;
