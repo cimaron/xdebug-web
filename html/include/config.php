@@ -20,5 +20,16 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-define('VERSION', '0.5');
+$config = array(
+
+	'title' => 'PHPDebugger v0.6',
+
+	'system.plugins' => array(
+		'jquery' => array(),
+		'jquery_ui_layout' => array(),
+		'menuPane' => array(),
+		'sourcePane' => array(),
+		'debugger/assets' => array(),
+	),
+);
 

@@ -69,7 +69,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 		table.find('tr:lt(' + (l - 20) + ')').remove();		
 
-		log.scrollTop(log.scrollTop());
+		log.scrollTop(log.height());
 	}
 	
 	WindowLayout.options.center.childOptions.south.childOptions.center.onresize = function() {

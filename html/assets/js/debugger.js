@@ -202,6 +202,8 @@ Debugger.prototype = {
 				data = this.parseXml(data);
 				this.log('debugger:data', data);
 
+				this.trigger('onDebuggerResponse', [{response : data}]);
+
 				//pass-thru
 
 			default:
@@ -392,7 +394,7 @@ Debugger.prototype = {
 
 		this.dbgStatus();
 		this.dbgSource(instance.fileuri);
-		
+
 		return;
 
 		this.displayFile(this.state.file);
@@ -444,6 +446,62 @@ Debugger.prototype = {
 	 */
 	proxySetName : function(name, success, failure) {
 		return this.sendProxyCommand('setName', name)
+			.then(success, failure)
+			;
+	},
+
+	breakpoint_type : {
+		line : 'line',
+		call : 'call',
+		'return' : 'return',
+		exception : 'exception',
+		conditional : 'conditional',
+		watch : 'watch'
+	},
+
+	/**
+	 * Send debugger breakpoint_set command
+	 *
+	 * @param   int     stack_depth   stack depth (optional)
+	 * @param   mixed   context_id    context ID (optional)
+	 * @param   mixed   success       Success callback (optional)
+	 * @param   mixed   failure       Failure callback (optional)
+	 *
+	 * @return  promise
+	 */
+	dbgBreakpointSet : function(type, file, line, state, func, exception, hit_value, hit_condition, data, success, failure) {
+		
+		var args = {};
+		
+		args.t = type;
+
+		if (file) {
+			args.f = file;
+		}
+		
+		if (line) {
+			args.n = line;	
+		}
+		
+		/*
+		file = this.parseFile(file).uri;
+		
+		var uid = file + "|" + line;
+
+		var breakpoint = {
+			uid : uid,
+			type : 'line',
+			file : file,
+			line : line
+		};
+
+		this.state.breakpoints[uid] = breakpoint;
+
+		this.displayBreakpoints();
+		*/
+
+		return this.sendDebuggerCommand('breakpoint_set', args, data)
+			.then(this.handleBreakpointSet.bind(this))
 			.then(success, failure)
 			;
 	},
@@ -558,6 +616,26 @@ Debugger.prototype = {
 	},
 
 	/**
+	 * Send debugger stack_get command
+	 *
+	 * @param   mixed    success   Success callback (optional)
+	 * @param   mixed    failure   Failure callback (optional)
+	 *
+	 * @return  promise
+	 */
+	dbgStackGet : function(stack_depth, success, failure) {
+
+		var args = {};
+		if (stack_depth) {
+			args.d = stack_depth;
+		}
+		
+		return this.sendDebuggerCommand('stack_get', args)
+			.then(success, failure)
+			;
+	},
+
+	/**
 	 * Send debugger status command
 	 *
 	 * @param   mixed    success   Success callback (optional)
@@ -617,10 +695,36 @@ Debugger.prototype = {
 	 * @return  promise
 	 */
 	dbgStepOver : function(success, failure) {
+
+		this.trigger('onDebuggerStatus', [{instance : null, status : 'running'}]);
+
 		return this.sendDebuggerCommand('step_over')
 			.then(this.handleStatus.bind(this))
 			.then(success, failure)
 			;
+	},
+
+	/**
+	 * Handle debugger breakpoint_set response packet
+	 *
+	 * @param   object   response   Object with debugger instance and response data
+	 */
+	handleBreakpointSet : function(response) {
+
+		var instance = response.instance;
+		var data = response.data;
+
+		//this.dbgBreakpointList();
+		//this.command('breakpoint_list', null, null, Debugger.handleBreakpointList);		
+
+		this.log('debugger:breakpoint_set', data);
+		
+		this.trigger('onBreakpointSet', [{
+			instance : instance,
+			data : data
+		}]);
+
+		return response;
 	},
 
 	/**
@@ -722,6 +826,54 @@ Debugger.prototype = {
 	},
 
 	/**
+	 * Handle stack_get response
+	 *
+	 * @param   object   response   Object with debugger instance and response data
+	 *
+	 * @return  hash
+	 */	
+	handleStackGet : function(response) {
+
+		var instance = response.instance;
+		var data = response.data;
+
+		var source = this.parseCData(data);
+
+		this.log('debugger:stack_get', source);
+
+
+		//populate context pane
+		var pane = $('#inspect-stack')
+		this.updateInspectPane(null, pane);
+
+		//collect nodes
+		var nodes = [];
+		for (var i = 0; i < data.children.length; i++) {
+			nodes.push(data.children[i]);	
+		}
+
+		nodes.reverse();
+
+		/*var stack = res.children;
+
+		//need to get current file info
+		if (this.state.file == '') {
+			var current = stack[0].attributes;
+			this.state.file = current.filename;
+			this.state.line = current.lineno;
+			this.displayFile(this.state.file);
+			this.command('source', {f : this.state.file}, null, Debugger.handleSource);
+		}
+		*/
+
+		for (var i = 0; i < nodes.length; i++) {
+			this.updateInspectPane(nodes[i], pane);
+		}
+		
+		return response;
+	},
+
+	/**
 	 * Handle the status response
 	 *
 	 * @param   object   response   Object with debugger instance and response data
@@ -793,15 +945,7 @@ Debugger.prototype = {
 					}]);
 				}
 
-				this.dbgContextGet().then(this.handleContextGet.bind(this));
-
 				/*
-				this.state.contextDirty = true;
-				this.state.watchDirty = true;
-				this.state.globalDirty = true;
-				this.state.definesDirty = true;
-				this.state.stackDirty = true;
-				this.state.breakpointsDirty = true;
 				if (!this.state.docroot) {
 					* /
 					this.dbgEval('realpath($_SERVER["DOCUMENT_ROOT"])').then(function(data) {
@@ -818,7 +962,6 @@ Debugger.prototype = {
 				}
 
 				this.command('stack_depth', null, null, Debugger.handleStackDepth);
-				this.activeTab(this.activeTab());
 				*/
 				break;
 
@@ -863,17 +1006,6 @@ Debugger.prototype = {
 	handleFeatureGet : function(res, trans) {
 		this.log('feature_get', res.attributes.feature_name + "=" + res.data);
 		this.state.features[res.attributes.feature_name] = res.data;
-	},
-
-	/**
-	 * Handle debugger breakpoint_set response packet
-	 *
-	 * @param   object   res     Response
-	 * @param   object   trans   Transaction
-	 */
-	handleBreakpointSet : function(res, trans) {
-		this.log('breakpoint_set', res);
-		this.command('breakpoint_list', null, null, Debugger.handleBreakpointList);		
 	},
 
 	/**
@@ -923,32 +1055,6 @@ Debugger.prototype = {
 	},
 
 
-	/**
-	 * Handle debugger stack_get response packet
-	 *
-	 * @param   object   res     Response
-	 * @param   object   trans   Transaction
-	 */	
-	handleStackGet : function(res, trans) {
-		this.log('stack_get', res);
-
-		var stack = res.children;
-
-		//need to get current file info
-		if (this.state.file == '') {
-			var current = stack[0].attributes;
-			this.state.file = current.filename;
-			this.state.line = current.lineno;
-			this.displayFile(this.state.file);
-			this.command('source', {f : this.state.file}, null, Debugger.handleSource);
-		}
-
-		//populate stack pane
-		this.updateInspectPane(null, this.options.elements.stack);
-		for (var i = 0; i < stack.length; i++) {
-			this.updateInspectPane(stack[i], this.options.elements.stack);			
-		}
-	},
 
 	/**
 	 * Handle debugger stack_depth response packet
@@ -1090,21 +1196,6 @@ Debugger.prototype = {
 	},
 
 	/**
-	 * Update breakpoints displayed
-	 */
-	displayBreakpoints : function() {
-
-		editor.session.clearBreakpoints();
-
-		var breakpoints = this.state.breakpoints;
-		for (var i in breakpoints) {
-			if (breakpoints[i].file == this.state.file) {
-				editor.session.setBreakpoint(breakpoints[i].line - 1);	
-			}
-		}
-	},
-
-	/**
 	 * Add data to inspect pane
 	 *
 	 * @param   object   data      Data object
@@ -1147,32 +1238,6 @@ Debugger.prototype = {
 
 
 	/**
-	 * Add a breakpoint
-	 *
-	 * @param   string   file   Filename
-	 * @param   int      line   Line number
-	 */
-	setBreakpoint : function(file, line) {
-
-		file = this.parseFile(file).uri;
-		
-		var uid = file + "|" + line;
-
-		var breakpoint = {
-			uid : uid,
-			type : 'line',
-			file : file,
-			line : line
-		};
-
-		this.state.breakpoints[uid] = breakpoint;
-
-		this.command('breakpoint_set', {t : breakpoint.type, f : breakpoint.file, n : breakpoint.line}, null, Debugger.handleBreakpointSet);
-		
-		this.displayBreakpoints();
-	},
-
-	/**
 	 * Remove a breakpoint
 	 *
 	 * @param   string   file   Filename
@@ -1208,48 +1273,7 @@ Debugger.prototype = {
 		this.command('eval', null, expr, Debugger.handleEval, false, {el : this.options.elements.watch, expr : expr, name : expr});
 	},
 
-	/**
-	 * Get or set active tab
-	 */
-	activeTab : function(tab) {
 
-		if (tab) {
-
-			if (tab == 'local' && this.state.contextDirty) {
-				this.command('context_get', null, null, Debugger.handleContextGet);
-				this.state.contextDirty = false;
-			}
-
-			if (tab == 'defines' && this.state.definesDirty) {
-				this.command('eval', null, "array('constants' => get_defined_constants(true), 'classes' => get_declared_classes(), 'functions' => get_defined_functions());", Debugger.handleDefines);				
-				this.state.definesDirty = false;
-			}
-
-			if (tab == 'global' && this.state.globalDirty) {
-				this.command('feature_set', {n : 'max_children', v : 1000});
-				this.command('feature_set', {n : 'max_depth', v : this.state.features.max_depth + 1});
-				this.command('property_get', {n : '$GLOBALS', d : this.state.stack_depth - 1}, null, Debugger.handleGlobal, false, {stack_depth : this.state.stack_depth - 1});
-				this.command('feature_set', {n : 'max_children', v : this.state.features.max_children});
-				this.command('feature_set', {n : 'max_depth', v : this.state.features.max_depth});
-				this.state.globalDirty = false;
-			}
-
-			if (tab == 'stack' && this.state.stackDirty) {
-				this.command('stack_get', null, null, Debugger.handleStackGet);
-				this.state.stackDirty = false;
-			}
-
-			if (tab == 'stack' && this.state.breakpointsDirty) {
-				this.command('breakpoint_list', null, null, Debugger.handleBreakpointList);
-				this.state.stackDirty = false;
-			}
-
-		} else {
-			var href = $('#inspect-pane .ui-tabs-active a').attr('href');
-			tab = href.match(/#inspect-([a-z]+)/)[1];
-			return tab;
-		}
-	},
 
 	getMore : function(name, element) {
 		var page = parseInt($(element).attr('rel'));

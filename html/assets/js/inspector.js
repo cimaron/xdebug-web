@@ -281,12 +281,6 @@ Inspector.prototype = {
 			
 			child.attributes.stack_depth = attrs.stack_depth;
 
-			if (attrs.type == 'object' && child.getAttribute('name') == 'CLASSNAME') {
-				data.children.splice(i, 1);
-				i--;
-				continue;
-			}
-
 			node.children[i] = this.makeTree(child);
 			if (attrs.type == 'array') {
 				node.children[i].name = '<span class="watch-key-array">' + node.children[i].name + '</span>';
@@ -315,7 +309,6 @@ Inspector.prototype = {
 				children : []
 			});
 		}
-
 
 		//get html by type
 		switch (attrs.type) {
@@ -378,7 +371,7 @@ Inspector.prototype = {
 				var full = '<span class="watch-file">' + filename + ' (line ' + line + ')</span>';
 
 				var onclick = "Debugger.getSource('" + filename.replace(/("')/, '\\$1') + "', " + line + ");";
-				filename = filename.replace('file://' + Debugger.state.docroot, '');
+				//filename = filename.replace('file://' + Debugger.state.docroot, '');
 				
 				node.display = '<span class="watch-file" onclick="' + onclick + '">' + filename + ' (line ' + line + ')</span>';
 				node.short = node.display;

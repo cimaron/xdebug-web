@@ -80,6 +80,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 	$().ready(function() {
 
+		var current_file = '';
+
 		editor = ace.edit("src");
 		editor.setTheme("ace/theme/dreamweaver");
 		editor.getSession().setMode("ace/mode/php");
@@ -102,10 +104,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	
 			if (!breakpoints[row]) {
 				e.editor.session.setBreakpoint(row);
-				Debugger.setBreakpoint(Debugger.state.file, row + 1);
+				debugger_ui.debugger.dbgBreakpointSet(debugger_ui.debugger.breakpoint_type.line, current_file, row + 1);				
 			} else {
-				e.editor.session.clearBreakpoint(Debugger.state.file, row);
-				Debugger.clearBreakpoint(Debugger.state.file, row + 1);
+				e.editor.session.clearBreakpoint(current_file, row);
+				//Debugger.clearBreakpoint(current_file, row + 1);
 			}
 			e.stop();
 		});
@@ -113,6 +115,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		var curline = 0;
 
 		debugger_ui.debugger.bind('onDebuggerFile', function(e) {
+			current_file = e.file;
 			$('#source-file').html($('<option>').text(e.file));
 		});
 
@@ -166,10 +169,33 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		});
 		
 		debugger_ui.debugger.bind('onRawData', function() {
+			
 		});
+
 		debugger_ui.debugger.bind('onSendProxyCommand', function() {
+			/*$('#proxy-status')
+				.removeClass('indicator-stopped')
+				.removeClass('indicator-running')
+				.removeClass('indicator-started')
+				;
+				*/		
 		});
 		
+
+		debugger_ui.debugger.bind('onBreakpointSet', function(e) {
+			/*
+			editor.session.clearBreakpoints();
+	
+			var breakpoints = this.state.breakpoints;
+			for (var i in breakpoints) {
+				if (breakpoints[i].file == this.state.file) {
+					editor.session.setBreakpoint(breakpoints[i].line - 1);	
+				}
+			}
+			*/
+			console.log(e);
+		
+		});
 
 		/*
 		//doesn't give us info on what breakpoint changed

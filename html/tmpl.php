@@ -30,7 +30,8 @@
 				size : '40%'
 			},
 			west : {
-				size : '15%'
+				size : '15%',
+				initClosed : true
 			},
 			center : {
 				paneSelector : ".outer-center",
@@ -46,7 +47,7 @@
 								paneSelector : ".inner-center",
 							}
 						},
-						size : 200
+						size : 150
 					}
 				}
 			}
