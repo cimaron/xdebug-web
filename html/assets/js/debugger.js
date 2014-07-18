@@ -141,7 +141,7 @@ Debugger.prototype = {
 
 		this.trigger('onProxyStatus', [{status : 'connected'}]);
 
-		this.proxySetName('cimaron').then(function(response) {
+		this.proxySetName('xdebug-web').then(function(response) {
 			this.log('proxy:setName', response.data);
 			this.trigger('onProxyStart');
 		}.bind(this));
